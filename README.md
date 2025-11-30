@@ -266,3 +266,46 @@ WHAT YOU MUST DO NOW
    - End Ride Mode cleanly
 
 Write clean, modular, well-typed code with clear comments showing where native or backend code will eventually replace mocks.
+
+## Running the app (Android, React Native 0.73)
+
+1) **Install prerequisites**
+
+- Node.js 18+ and yarn or npm
+- Android Studio with Android SDK, platform tools, and at least one Android 13 (API 33) image
+- Java 17 (required by React Native 0.73 build tooling)
+
+2) **Install JS dependencies**
+
+```bash
+yarn install
+# or
+npm install
+```
+
+3) **Configure an Android device/emulator**
+
+- Start an emulator from Android Studio **or** connect a physical device with USB debugging enabled.
+- Ensure `adb devices` lists your target.
+
+4) **Start Metro (JavaScript bundler)**
+
+In one terminal, from the repo root:
+
+```bash
+yarn start
+# or
+npm run start
+```
+
+5) **Build and launch the Android app**
+
+In another terminal:
+
+```bash
+yarn android
+# or
+npm run android
+```
+
+> The current MVP uses mocked native/back-end services. No extra native setup is required beyond the standard React Native Android toolchain.

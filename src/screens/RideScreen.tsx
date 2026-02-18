@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../app/App';
 import { mockBluetooth } from '../modules/services';
 import { useAppStore } from '../state/store';
 
-const RideScreen = ({ navigation }: NativeStackScreenProps<RootStackParamList, 'Ride'>) => {
+const RideScreen = ({ navigation }: StackScreenProps<RootStackParamList, 'Ride'>) => {
   const {
     rideMode,
     ridePreference,
@@ -16,6 +16,8 @@ const RideScreen = ({ navigation }: NativeStackScreenProps<RootStackParamList, '
     intercomState,
     localMuted,
     globalMuted,
+    lastSummary,
+    isRecording,
     endRide,
     toggleLocalMute,
     toggleGlobalMute,
@@ -29,15 +31,24 @@ const RideScreen = ({ navigation }: NativeStackScreenProps<RootStackParamList, '
     intercomState: state.intercomState,
     localMuted: state.localMuted,
     globalMuted: state.globalMuted,
+    lastSummary: state.lastSummary,
+    isRecording: state.isRecording,
     endRide: state.endRide,
     toggleLocalMute: state.toggleLocalMute,
     toggleGlobalMute: state.toggleGlobalMute,
   }));
 
+  useEffect(() => {
+    if (rideMode === 'ENDED' && lastSummary) {
+      navigation.replace('RideSummary', { summaryId: lastSummary.id });
+    }
+  }, [rideMode, lastSummary, navigation]);
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Ride Mode</Text>
       <Text>Mode: {rideMode}</Text>
+      {isRecording ? <Text style={styles.recording}>Recording…</Text> : null}
       <Text>Preference: {ridePreference ?? 'N/A'}</Text>
       <Text>Helmet: {helmetConnected ? 'Connected' : 'Disconnected'}</Text>
       <Text>Last location: {lastLocation ?? 'Unknown'}</Text>
@@ -112,6 +123,10 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     marginVertical: 6,
+  },
+  recording: {
+    color: '#2d6cdf',
+    fontWeight: '600',
   },
 });
 

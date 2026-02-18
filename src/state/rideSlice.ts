@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { HeadsetEventType } from '../modules/bluetooth/types';
 import { services } from '../modules/services';
 import { RideMode, RidePreference, RideSessionHandles } from './types';
+import { AnalyticsSlice } from './analyticsSlice';
 import { ProximitySlice } from './proximitySlice';
 import { VoiceSlice } from './voiceSlice';
 
@@ -17,7 +18,7 @@ export interface RideSlice {
   endRide: () => Promise<void>;
 }
 
-type Store = RideSlice & ProximitySlice & VoiceSlice;
+type Store = RideSlice & ProximitySlice & VoiceSlice & AnalyticsSlice;
 
 const formatLocation = (lat: number, lon: number) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 
@@ -71,8 +72,12 @@ export const createRideSlice: StateCreator<
     await services.bluetooth.startScanning((beacon) => get().upsertRider(beacon));
     handles.stopScanning = services.bluetooth.stopScanning;
 
+    services.analytics.startSession();
+    get().setRecording(true);
+
     await services.location.startTracking(async (loc) => {
       set({ lastLocation: formatLocation(loc.lat, loc.lon) });
+      services.analytics.onLocation(loc);
       await services.apiClient.updatePresence({
         riderId,
         lat: loc.lat,
@@ -82,6 +87,9 @@ export const createRideSlice: StateCreator<
       });
     });
     handles.stopLocation = services.location.stopTracking;
+
+    await services.imu.startIMUTracking((sample) => services.analytics.onIMUSample(sample));
+    handles.stopIMU = services.imu.stopIMUTracking;
 
     handles.channelInterval = setInterval(async () => {
       const response = await services.apiClient.getAssignedChannel();
@@ -124,9 +132,14 @@ export const createRideSlice: StateCreator<
     if (handles?.unsubscribeHeadset) handles.unsubscribeHeadset();
     if (handles?.unsubscribeHelmet) handles.unsubscribeHelmet();
     if (handles?.unsubscribeVoice) handles.unsubscribeVoice();
+    if (handles?.stopIMU) await handles.stopIMU();
     if (handles?.stopScanning) await handles.stopScanning();
     if (handles?.stopAdvertising) await handles.stopAdvertising();
     if (handles?.stopLocation) await handles.stopLocation();
+
+    const summary = await services.analytics.endSession();
+    get().setLastSummary(summary);
+    get().setRecording(false);
 
     await services.voice.leaveChannel();
     get().clearProximity();

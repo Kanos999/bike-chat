@@ -26,6 +26,7 @@ export interface RideSessionHandles {
   unsubscribeHelmet?: () => void;
   unsubscribeVoice?: () => void;
   stopLocation?: () => Promise<void>;
+  stopIMU?: () => Promise<void>;
   stopScanning?: () => Promise<void>;
   stopAdvertising?: () => Promise<void>;
 }

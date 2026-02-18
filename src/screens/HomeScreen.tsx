@@ -1,16 +1,19 @@
 import React, { useCallback } from 'react';
 import { Button, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../app/App';
 import { useAppStore } from '../state/store';
 
-const HomeScreen = ({ navigation }: NativeStackScreenProps<RootStackParamList, 'Home'>) => {
-  const { rideMode, ridePreference, statusMessage, startRide } = useAppStore((state) => ({
-    rideMode: state.rideMode,
-    ridePreference: state.ridePreference,
-    statusMessage: state.statusMessage,
-    startRide: state.startRide,
-  }));
+const HomeScreen = ({ navigation }: StackScreenProps<RootStackParamList, 'Home'>) => {
+  const { rideMode, ridePreference, statusMessage, lastSummary, startRide } = useAppStore(
+    (state) => ({
+      rideMode: state.rideMode,
+      ridePreference: state.ridePreference,
+      statusMessage: state.statusMessage,
+      lastSummary: state.lastSummary,
+      startRide: state.startRide,
+    }),
+  );
 
   const canStart = rideMode === 'IDLE' || rideMode === 'ENDED';
 
@@ -42,6 +45,13 @@ const HomeScreen = ({ navigation }: NativeStackScreenProps<RootStackParamList, '
 
       <View style={styles.buttonRow}>
         <Button title="Go to Ride Screen" onPress={() => navigation.navigate('Ride')} />
+      </View>
+      <View style={styles.buttonRow}>
+        <Button
+          title="View last ride"
+          disabled={!lastSummary}
+          onPress={() => navigation.navigate('RideSummary', { summaryId: lastSummary?.id })}
+        />
       </View>
       <View style={styles.buttonRow}>
         <Button title="Settings" onPress={() => navigation.navigate('Settings')} />

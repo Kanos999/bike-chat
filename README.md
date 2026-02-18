@@ -309,3 +309,54 @@ npm run android
 ```
 
 > The current MVP uses mocked native/back-end services. No extra native setup is required beyond the standard React Native Android toolchain.
+
+---
+
+## Run and debug (quick reference)
+
+### Prerequisites
+
+- **Node.js** 18+
+- **Android Studio** with Android SDK, platform tools, and an Android 13 (API 33) system image
+- **Java 17** (needed for React Native 0.73)
+- **Device or emulator:** `adb devices` must list at least one target
+
+### Run the app
+
+1. **Install dependencies** (repo root):
+
+   ```bash
+   npm install
+   ```
+
+2. **Start Metro** (leave this running):
+
+   ```bash
+   npm run start
+   ```
+
+3. **In a second terminal, build and run on Android:**
+
+   ```bash
+   npm run android
+   ```
+
+   This builds the app and installs/launches it on the emulator or connected device. Use `npm run android -- --deviceId=<id>` to pick a device when multiple are connected.
+
+### Debug
+
+- **TypeScript:** Run `npm run typecheck` to type-check without building.
+
+- **Console logs:** Use `console.log` (or `console.warn` / `console.error`). In the Android emulator, press **Ctrl+M** (or Cmd+M on Mac) → **“Debug”** to open Chrome DevTools and see logs in the **Console** tab. On a physical device, enable USB debugging and use **adb logcat** or the same in-app debug menu.
+
+- **React DevTools:** Install the standalone [React Developer Tools](https://react.dev/learn/react-developer-tools). With the app running, open the app and then React DevTools to inspect component tree and props/state.
+
+- **Zustand (store):** The store is wrapped with `devtools` (name: `BikeChatStore`). With [Redux DevTools Extension](https://github.com/reduxjs/redux-devtools) installed in Chrome, use “Open React Native Debugger” or the in-app “Debug” → “Open Debugger” so the extension can connect and you can inspect actions and state (ride, proximity, voice, analytics).
+
+- **Breakpoints (Cursor / VS Code):**
+  1. Start Metro with `npm run start`.
+  2. Run the app with “Debug” (in-app menu) so the JS runs in Chrome or a debugger.
+  3. In the editor, set breakpoints in your `.ts`/`.tsx` files.
+  4. Use the **Run and Debug** panel (e.g. “Attach to packager” or “Debug Android”) so the debugger attaches to the Metro bundle and your breakpoints are hit.
+
+- **Reload:** In the emulator/device, press **R** twice (double-tap R) or **Ctrl+M** (Cmd+M) → **Reload** to reload the JS bundle after code changes.

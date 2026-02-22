@@ -6,11 +6,8 @@ export interface PresenceUpdate {
   timestamp: number;
 }
 
+export interface StoredPresence extends PresenceUpdate {}
+
 export interface NearbyChannelResponse {
   channelId: string | null;
-}
-
-export interface ApiClient {
-  updatePresence(update: PresenceUpdate): Promise<void>;
-  getAssignedChannel(riderId: string): Promise<NearbyChannelResponse>;
 }

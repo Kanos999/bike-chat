@@ -1,12 +1,14 @@
-import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import HomeScreen from '../screens/HomeScreen';
-import RideScreen from '../screens/RideScreen';
 import RideSummaryScreen from '../screens/RideSummaryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import { config } from '../config';
 import { services } from '../modules/services';
+import { loadProfile } from '../state/profileStorage';
 import { useAppStore } from '../state/store';
+
+export type ScreenName = 'Home' | 'Ride' | 'RideSummary' | 'Settings';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -15,25 +17,74 @@ export type RootStackParamList = {
   Settings: undefined;
 };
 
-const Stack = createStackNavigator<RootStackParamList>();
+export type AppNavigation = {
+  navigate: <T extends ScreenName>(
+    screen: T,
+    params?: RootStackParamList[T] extends undefined ? undefined : RootStackParamList[T],
+  ) => void;
+  replace: <T extends ScreenName>(
+    screen: T,
+    params?: RootStackParamList[T] extends undefined ? undefined : RootStackParamList[T],
+  ) => void;
+  goBack: () => void;
+};
 
 const App = () => {
+  const [screen, setScreen] = useState<ScreenName>('Home');
+  const [params, setParams] = useState<RootStackParamList[ScreenName]>(undefined);
+  const [history, setHistory] = useState<ScreenName[]>(['Home']);
+
+  const navigation: AppNavigation = React.useMemo(
+    () => ({
+      navigate: (name, p) => {
+        setParams(p ?? undefined);
+        setScreen(name);
+        setHistory((h) => [...h, name]);
+      },
+      replace: (name, p) => {
+        setParams(p ?? undefined);
+        setScreen(name);
+        setHistory((h) => [...h.slice(0, -1), name]);
+      },
+      goBack: () => {
+        setHistory((h) => {
+          if (h.length <= 1) return h;
+          const next = h.slice(0, -1);
+          setScreen(next[next.length - 1]);
+          setParams(undefined);
+          return next;
+        });
+      },
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    config.riderIdGetter = () => useAppStore.getState().riderId;
+  }, []);
+  useEffect(() => {
+    loadProfile().then((profile) => useAppStore.getState().hydrateProfile(profile));
+  }, []);
   useEffect(() => {
     services.analytics.getLastSummary().then((summary) => {
       if (summary) useAppStore.getState().setLastSummary(summary);
     });
   }, []);
 
-  return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Ride" component={RideScreen} />
-        <Stack.Screen name="RideSummary" component={RideSummaryScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
+  const renderScreen = () => {
+    switch (screen) {
+      case 'Home':
+        return <HomeScreen navigation={navigation} />;
+      case 'RideSummary':
+        return <RideSummaryScreen navigation={navigation} route={{ params: params as RootStackParamList['RideSummary'] }} />;
+      case 'Settings':
+        return <SettingsScreen navigation={navigation} />;
+      default:
+        return <HomeScreen navigation={navigation} />;
+    }
+  };
+
+  return <View style={{ flex: 1 }}>{renderScreen()}</View>;
 };
 
 export default App;

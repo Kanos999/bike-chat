@@ -61,6 +61,10 @@ export const createMockVoiceModule = (): VoiceModule => {
     };
   };
 
+  const subscribeToInputLevel = (_callback: (level: number) => void) => {
+    return () => {};
+  };
+
   return {
     init,
     joinChannel,
@@ -69,5 +73,6 @@ export const createMockVoiceModule = (): VoiceModule => {
     setGlobalMute,
     getState,
     onStateChange,
+    subscribeToInputLevel,
   };
 };

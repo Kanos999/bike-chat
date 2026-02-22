@@ -1,10 +1,11 @@
 buildscript {
     ext {
         buildToolsVersion = "34.0.0"
-        minSdkVersion = 21
+        minSdkVersion = 24
         compileSdkVersion = 34
         targetSdkVersion = 34
-        ndkVersion = "25.1.8937393"
+        // Use an NDK version that has source.properties (e.g. install via Android Studio SDK Manager)
+        ndkVersion = "26.1.10909125"
         kotlinVersion = "1.8.0"
     }
     repositories {

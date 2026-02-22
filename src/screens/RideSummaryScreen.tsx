@@ -3,12 +3,10 @@ import {
   Button,
   Dimensions,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList } from '../app/App';
+import type { AppNavigation, RootStackParamList } from '../app/App';
 import { useAppStore } from '../state/store';
 import type { RideSummary } from '../modules/analytics';
 
@@ -46,16 +44,16 @@ function SimpleBarChart({
   suffix: string;
   color: string;
 }) {
-  if (data.length < 2) return <Text style={styles.chartPlaceholder}>Not enough data</Text>;
+  if (data.length < 2) return <Text className="text-bike-text-dim py-4 tracking-wide">Not enough data</Text>;
   const max = Math.max(...data, 1);
   const barWidth = Math.max(2, (chartWidth - (data.length - 1) * 2) / data.length);
 
   return (
-    <View style={styles.chartSection}>
-      <Text style={styles.chartTitle}>
+    <View className="mb-6">
+      <Text className="text-base font-semibold text-bike-orange-muted mb-2 tracking-widest">
         {title} ({suffix})
       </Text>
-      <View style={[styles.chartContainer, { height: CHART_HEIGHT }]}>
+      <View className="flex-row items-end bg-bike-card rounded-lg p-1 border border-bike-border-orange" style={{ height: CHART_HEIGHT }}>
         {data.map((v, i) => (
           <View
             key={i}
@@ -75,49 +73,49 @@ function SimpleBarChart({
 
 function VelocityChart({ summary }: { summary: RideSummary }) {
   const points = summary.velocityProfile;
-  if (points.length === 0) return <Text style={styles.chartPlaceholder}>No velocity data</Text>;
+  if (points.length === 0) return <Text className="text-bike-text-dim py-4 tracking-wide">No velocity data</Text>;
   const { data } = downsample(
     points,
     points.map((p) => p.speedKph),
   );
-  return <SimpleBarChart data={data} title="Velocity" suffix="kph" color="#4fc3f7" />;
+  return <SimpleBarChart data={data} title="Velocity" suffix="kph" color="#ff8833" />;
 }
 
 function LeanChart({ summary }: { summary: RideSummary }) {
   const points = summary.leanProfile;
-  if (points.length === 0) return <Text style={styles.chartPlaceholder}>No lean data</Text>;
+  if (points.length === 0) return <Text className="text-bike-text-dim py-4 tracking-wide">No lean data</Text>;
   const { data } = downsample(
     points,
     points.map((p) => p.leanDeg),
   );
-  return <SimpleBarChart data={data} title="Lean angle" suffix="deg" color="#81c784" />;
+  return <SimpleBarChart data={data} title="Lean angle" suffix="deg" color="#cc7733" />;
 }
 
 function StatsBlock({ summary }: { summary: RideSummary }) {
   const s = summary.stats;
   return (
-    <View style={styles.statsBlock}>
-      <Text style={styles.statsTitle}>Ride stats</Text>
-      <View style={styles.statsRow}>
-        <Text>Max speed: {s.maxSpeedKph.toFixed(1)} kph</Text>
+    <View className="mb-6 p-4 bg-bike-card rounded-lg border border-bike-border-orange">
+      <Text className="text-base font-semibold text-bike-orange-muted mb-2 tracking-widest">Ride stats</Text>
+      <View className="py-1">
+        <Text className="text-bike-text text-sm tracking-wide">Max speed: {s.maxSpeedKph.toFixed(1)} kph</Text>
       </View>
-      <View style={styles.statsRow}>
-        <Text>Avg speed: {s.avgSpeedKph.toFixed(1)} kph</Text>
+      <View className="py-1">
+        <Text className="text-bike-text text-sm tracking-wide">Avg speed: {s.avgSpeedKph.toFixed(1)} kph</Text>
       </View>
-      <View style={styles.statsRow}>
-        <Text>Max lean L: {s.maxLeanLeftDeg.toFixed(1)}°</Text>
+      <View className="py-1">
+        <Text className="text-bike-text text-sm tracking-wide">Max lean L: {s.maxLeanLeftDeg.toFixed(1)}°</Text>
       </View>
-      <View style={styles.statsRow}>
-        <Text>Max lean R: {s.maxLeanRightDeg.toFixed(1)}°</Text>
+      <View className="py-1">
+        <Text className="text-bike-text text-sm tracking-wide">Max lean R: {s.maxLeanRightDeg.toFixed(1)}°</Text>
       </View>
-      <View style={styles.statsRow}>
-        <Text>Distance: {s.distanceKm.toFixed(2)} km</Text>
+      <View className="py-1">
+        <Text className="text-bike-text text-sm tracking-wide">Distance: {s.distanceKm.toFixed(2)} km</Text>
       </View>
-      <View style={styles.statsRow}>
-        <Text>Time moving: {s.timeMovingSec.toFixed(0)}s</Text>
+      <View className="py-1">
+        <Text className="text-bike-text text-sm tracking-wide">Time moving: {s.timeMovingSec.toFixed(0)}s</Text>
       </View>
-      <View style={styles.statsRow}>
-        <Text>Time stopped: {s.timeStoppedSec.toFixed(0)}s</Text>
+      <View className="py-1">
+        <Text className="text-bike-text text-sm tracking-wide">Time stopped: {s.timeStoppedSec.toFixed(0)}s</Text>
       </View>
     </View>
   );
@@ -125,89 +123,38 @@ function StatsBlock({ summary }: { summary: RideSummary }) {
 
 const RideSummaryScreen = ({
   navigation,
-}: StackScreenProps<RootStackParamList, 'RideSummary'>) => {
+  route,
+}: {
+  navigation: AppNavigation;
+  route: { params?: RootStackParamList['RideSummary'] };
+}) => {
   const lastSummary = useAppStore((state) => state.lastSummary);
 
   if (!lastSummary) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Ride summary</Text>
-        <Text style={styles.empty}>No ride data</Text>
-        <View style={styles.buttonRow}>
-          <Button title="Back to Home" onPress={() => navigation.navigate('Home')} />
+      <View className="flex-1 p-6 justify-center bg-bike-bg">
+        <Text className="text-[22px] font-bold mb-4 text-bike-text tracking-wide">Ride summary</Text>
+        <Text className="mb-6 text-bike-text-dim tracking-wide">No ride data</Text>
+        <View className="mt-4">
+          <Button title="Back to Home" onPress={() => navigation.navigate('Home')} color="#cc7733" />
         </View>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
-      <Text style={styles.title}>Ride summary</Text>
-      <StatsBlock summary={lastSummary} />
-      <VelocityChart summary={lastSummary} />
-      <LeanChart summary={lastSummary} />
-      <View style={styles.buttonRow}>
-        <Button title="Back to Home" onPress={() => navigation.navigate('Home')} />
+    <ScrollView>
+      <View className="p-6 pb-12 bg-bike-bg">
+        <Text className="text-[22px] font-bold mb-4 text-bike-text tracking-wide">Ride summary</Text>
+        <StatsBlock summary={lastSummary} />
+        <VelocityChart summary={lastSummary} />
+        <LeanChart summary={lastSummary} />
+        <View className="mt-4">
+          <Button title="Back to Home" onPress={() => navigation.navigate('Home')} color="#cc7733" />
+        </View>
       </View>
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  scroll: {
-    padding: 24,
-    paddingBottom: 48,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  empty: {
-    marginBottom: 24,
-    color: '#666',
-  },
-  statsBlock: {
-    marginBottom: 24,
-    padding: 16,
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-  },
-  statsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  statsRow: {
-    paddingVertical: 4,
-  },
-  chartSection: {
-    marginBottom: 24,
-  },
-  chartTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  chartContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 4,
-  },
-  chartPlaceholder: {
-    color: '#666',
-    paddingVertical: 16,
-  },
-  buttonRow: {
-    marginTop: 16,
-  },
-});
 
 export default RideSummaryScreen;

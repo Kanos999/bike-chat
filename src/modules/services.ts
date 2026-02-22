@@ -1,13 +1,17 @@
 import * as analytics from './analytics';
 import { createMockApiClient } from './api/mockApiClient';
+import { createRealApiClient } from './api/realApiClient';
 import { ApiClient } from './api/types';
 import { createMockBluetoothModule, MockBluetoothModule } from './bluetooth/mockBluetooth';
+import { getRealBluetoothModule } from './bluetooth/realBluetooth';
 import { BluetoothModule } from './bluetooth/types';
-import { createMockIMUModule } from './imu';
+import { getRealIMUModule, createMockIMUModule } from './imu';
 import { IMUModule } from './imu/types';
 import { createMockLocationModule } from './location/mockLocation';
+import { createRealLocationModule } from './location/realLocation';
 import { LocationModule } from './location/types';
 import { createMockVoiceModule } from './voice/mockVoiceModule';
+import { createWebRTCVoiceModule } from './voice/webrtcVoiceModule';
 import { VoiceModule } from './voice/types';
 
 export interface Services {
@@ -25,11 +29,17 @@ export interface Services {
   };
 }
 
-const bluetooth = createMockBluetoothModule();
-const location = createMockLocationModule();
-const imu = createMockIMUModule();
-const voice = createMockVoiceModule();
-const apiClient = createMockApiClient();
+const useRealApi = typeof __DEV__ !== 'undefined' && __DEV__;
+const useRealLocation = typeof __DEV__ !== 'undefined' && __DEV__;
+const useRealVoice = typeof __DEV__ !== 'undefined' && __DEV__;
+const realIMU = getRealIMUModule();
+const realBle = getRealBluetoothModule();
+
+const bluetooth: BluetoothModule = realBle ?? createMockBluetoothModule();
+const location = useRealLocation ? createRealLocationModule() : createMockLocationModule();
+const imu: IMUModule = realIMU ?? createMockIMUModule();
+const voice: VoiceModule = useRealVoice ? createWebRTCVoiceModule() : createMockVoiceModule();
+const apiClient: ApiClient = useRealApi ? createRealApiClient() : createMockApiClient();
 
 export const services: Services = {
   bluetooth,

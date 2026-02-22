@@ -51,6 +51,15 @@ react {
     // hermesFlags = ["-O", "-output-source-map"]
 }
 
+// Pin androidx.core to a version compatible with compileSdk 34 and AGP 8.1.x
+// (avoids pulling in 1.16.0 which requires compileSdk 35 and AGP 8.6+)
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.core:core-ktx:1.12.0'
+        force 'androidx.core:core:1.12.0'
+    }
+}
+
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */

@@ -5,15 +5,20 @@ import { RideMode, RidePreference, RideSessionHandles } from './types';
 import { AnalyticsSlice } from './analyticsSlice';
 import { ProximitySlice } from './proximitySlice';
 import { VoiceSlice } from './voiceSlice';
+import { saveProfile } from './profileStorage';
+import type { StoredProfile } from './profileStorage';
 
 export interface RideSlice {
   rideMode: RideMode;
   ridePreference: RidePreference | null;
   riderId: string;
+  username: string;
   helmetConnected: boolean;
   lastLocation: string | null;
   statusMessage: string | null;
   sessionHandles: RideSessionHandles | null;
+  hydrateProfile: (profile: StoredProfile) => void;
+  setUsername: (username: string) => Promise<void>;
   startRide: (preference: RidePreference) => Promise<void>;
   endRide: () => Promise<void>;
 }
@@ -38,13 +43,24 @@ export const createRideSlice: StateCreator<
 > = (set, get) => ({
   rideMode: 'IDLE',
   ridePreference: null,
-  riderId: `rider-${Math.floor(Math.random() * 10000)}`,
+  riderId: '',
+  username: '',
   helmetConnected: false,
   lastLocation: null,
   statusMessage: null,
   sessionHandles: null,
+  hydrateProfile: (profile) =>
+    set({ username: profile.username, riderId: profile.username }),
+  setUsername: async (username) => {
+    set({ username, riderId: username });
+    await saveProfile({ username });
+  },
   startRide: async (preference) => {
     const riderId = get().riderId;
+    if (!riderId.trim()) {
+      set({ statusMessage: 'Set your username in Settings first' });
+      return;
+    }
     const handles: RideSessionHandles = {};
     set({ rideMode: 'INITIALISING', ridePreference: preference, statusMessage: 'Starting ride…' });
     get().clearProximity();
@@ -92,7 +108,7 @@ export const createRideSlice: StateCreator<
     handles.stopIMU = services.imu.stopIMUTracking;
 
     handles.channelInterval = setInterval(async () => {
-      const response = await services.apiClient.getAssignedChannel();
+      const response = await services.apiClient.getAssignedChannel(get().riderId);
       const current = get().currentChannelId;
       if (response.channelId !== current) {
         if (response.channelId) {

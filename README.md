@@ -308,7 +308,29 @@ yarn android
 npm run android
 ```
 
-> The current MVP uses mocked native/back-end services. No extra native setup is required beyond the standard React Native Android toolchain.
+6) **Optional: Run with real backend and sensors**
+
+In **development** (`__DEV__`), the app uses real API, location, voice signalling, and (on Android) real IMU when available. To use the real backend:
+
+- Start the backend from the repo root (in a separate terminal):
+
+  ```bash
+  cd backend && npm install && npm run dev
+  ```
+
+  The API + WebSocket run on `http://localhost:3000` (API at `/presence`, WebSocket at `/ws`).
+
+- On the **Android emulator**, the app is configured to use `http://10.0.2.2:3000` as the API/WS base (10.0.2.2 is the host machine’s localhost). No code change needed.
+
+- **Location:** Grant location permission when prompted. The app uses `@react-native-community/geolocation` with high accuracy and a 10 m distance filter.
+
+- **IMU:** The Android native module (`IMUModule`) streams accelerometer and gyroscope; the app falls back to a mock if the module is unavailable (e.g. on iOS).
+
+- **Voice:** Real voice uses WebSocket signalling only (join/leave channel, state). Actual WebRTC audio can be added later.
+
+To force mocks only, you would set the service flags in `src/modules/services.ts` to `false` (e.g. `useRealApi = false`).
+
+> The current MVP can run fully mocked (no backend) or with the real backend and sensors as above.
 
 ---
 

@@ -19,10 +19,10 @@ Node.js/TypeScript service that provides **presence**, **channel assignment**, a
   Returns the channel the rider should join, if any.
 
   - **Response:** `{ channelId: string | null }`
-  - **Behaviour:** A rider gets a non-null `channelId` only when **at least two riders** are in the same geohash cell and their ride modes are compatible:
-    - **OPEN:** any rider in the same cell can share a channel.
-    - **FRIENDS_ONLY:** only riders with `rideMode: 'FRIENDS_ONLY'` in the same cell are grouped.
-  - Channel id format: `channel-<geohash>` (e.g. `channel-9q8yy`).
+  - **Behaviour:** A rider gets a non-null `channelId` when at least two compatible riders are connected through proximity links of **<=150 m**.
+    - **OPEN:** can match any nearby rider in OPEN/FRIENDS_ONLY compatibility rules.
+    - **FRIENDS_ONLY:** only matches nearby riders in FRIENDS_ONLY mode.
+  - Channel id format: `channel-<geohash>` where the geohash is derived from the connected group centroid (stable, but not restricted to one geohash cell).
 
 So: clients **push** presence with `POST /presence`, and **poll** `GET /presence/channel` to know when to join/leave a channel. No authentication in this MVP.
 
@@ -192,7 +192,7 @@ Set the app’s base URL (e.g. in `src/config.ts` or via env) to your deployed h
 | Component        | Role                                                                 |
 |-----------------|----------------------------------------------------------------------|
 | **POST /presence** | Update rider location and mode; stored in memory with 90 s TTL.     |
-| **GET /presence/channel** | Return shared channel id when ≥2 riders in same geohash/mode.       |
+| **GET /presence/channel** | Return shared channel id when ≥2 compatible riders are connected within 150 m links. |
 | **Presence store** | In-memory map + geohash; pruned every 30 s.                         |
 | **WebSocket /ws**  | Join channel by `channelId`/`riderId`; relay offer/answer/ice.       |
 | **Single process** | One port (default 3000) for HTTP and WS.                            |

@@ -382,3 +382,20 @@ To force mocks only, you would set the service flags in `src/modules/services.ts
   4. Use the **Run and Debug** panel (e.g. “Attach to packager” or “Debug Android”) so the debugger attaches to the Metro bundle and your breakpoints are hit.
 
 - **Reload:** In the emulator/device, press **R** twice (double-tap R) or **Ctrl+M** (Cmd+M) → **Reload** to reload the JS bundle after code changes.
+
+## Supabase authentication wiring (client)
+
+The app now gates entry behind a login screen and uses Supabase Auth (email/password) via REST calls.
+
+Before app launch, set these globals in `index.tsx` (or your app bootstrap):
+
+```ts
+(global as any).__BikeChatSupabaseUrl = 'https://<project-ref>.supabase.co';
+(global as any).__BikeChatSupabaseAnonKey = '<supabase-anon-key>';
+(global as any).__BikeChatApiBaseUrl = 'https://<your-backend-host>';
+```
+
+Auth flow behavior:
+- Login/sign-up stores session in AsyncStorage.
+- Access token is exposed to API/WS via `__BikeChatSupabaseAccessToken` automatically.
+- Sign out clears local session and backend token usage.

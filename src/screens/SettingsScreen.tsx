@@ -14,10 +14,14 @@ const SettingsScreen = ({ navigation }: { navigation: AppNavigation }) => {
     username,
     ridePreference,
     setUsername,
+    logout,
+    authLoading,
   } = useAppStore((state) => ({
     username: state.username,
     ridePreference: state.ridePreference,
     setUsername: state.setUsername,
+    logout: state.logout,
+    authLoading: state.authLoading,
   }));
 
   const [draftUsername, setDraftUsername] = useState(username);
@@ -81,6 +85,20 @@ const SettingsScreen = ({ navigation }: { navigation: AppNavigation }) => {
           Native settings such as Bluetooth, permissions, and headset bindings
           will live here in a future build.
         </Text>
+
+
+        <View className="mt-4 pt-4 border-t border-bike-border-orange">
+          <TouchableOpacity
+            className="py-3 px-6 bg-bike-card rounded-lg border border-red-500 items-center"
+            onPress={logout}
+            disabled={authLoading}
+            activeOpacity={0.85}
+          >
+            <Text className="text-base font-bold text-red-400 tracking-wide">
+              {authLoading ? 'Signing out…' : 'Sign out'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View className="mt-6 pt-4 border-t border-bike-border-orange">
           <TouchableOpacity

@@ -9,9 +9,29 @@
  */
 const getDefaultBaseUrl = (): string => {
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
-    return 'http://192.168.0.79:3000'; // Android emulator → host (fails on physical device)
+    return 'http://10.0.2.2:3000';
   }
   return 'https://your-backend.example.com';
+};
+
+
+const getSupabase = (): { url: string | null; anonKey: string | null } => {
+  const globals = global as unknown as {
+    __BikeChatSupabaseUrl?: string;
+    __BikeChatSupabaseAnonKey?: string;
+  };
+  return {
+    url: globals.__BikeChatSupabaseUrl ?? null,
+    anonKey: globals.__BikeChatSupabaseAnonKey ?? null,
+  };
+};
+
+const getAuthToken = (): string | null => {
+  const globals = global as unknown as {
+    __BikeChatAuthToken?: string;
+    __BikeChatSupabaseAccessToken?: string;
+  };
+  return globals.__BikeChatAuthToken ?? globals.__BikeChatSupabaseAccessToken ?? null;
 };
 
 export const config = {
@@ -23,6 +43,15 @@ export const config = {
   get wsBaseUrl(): string {
     const base = this.apiBaseUrl.replace(/^http/, 'ws');
     return `${base}/ws`;
+  },
+  get authToken(): string | null {
+    return getAuthToken();
+  },
+  get supabaseUrl(): string | null {
+    return getSupabase().url;
+  },
+  get supabaseAnonKey(): string | null {
+    return getSupabase().anonKey;
   },
   /** Set by app init so real voice can get current riderId. */
   riderIdGetter: null as (() => string) | null,

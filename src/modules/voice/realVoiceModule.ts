@@ -33,7 +33,8 @@ export function createRealVoiceModule(): VoiceModule {
   const joinChannel = async (channelId: string): Promise<void> => {
     closeWs();
     const riderId = config.getRiderId();
-    const url = `${config.wsBaseUrl}?channelId=${encodeURIComponent(channelId)}&riderId=${encodeURIComponent(riderId)}`;
+    const tokenParam = config.authToken ? `&token=${encodeURIComponent(config.authToken)}` : '';
+    const url = `${config.wsBaseUrl}?channelId=${encodeURIComponent(channelId)}&riderId=${encodeURIComponent(riderId)}${tokenParam}`;
     return new Promise((resolve, reject) => {
       try {
         ws = new WebSocket(url);

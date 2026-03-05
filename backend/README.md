@@ -198,3 +198,36 @@ Set the app’s base URL (e.g. in `src/config.ts` or via env) to your deployed h
 | **Single process** | One port (default 3000) for HTTP and WS.                            |
 
 **Best way to run a deployed version:** Run the compiled app (`npm run build && npm start`) on a **single, long-running host** (VPS, PaaS, or container), put a **reverse proxy** in front for HTTPS/WSS, and point the mobile app at that base URL.
+
+## Auth and readiness (MVP)
+
+- Optional shared-token auth is enabled by setting `AUTH_TOKEN`.
+  - REST: send `Authorization: Bearer <AUTH_TOKEN>`.
+  - WebSocket: append `&token=<AUTH_TOKEN>` to `/ws` URL.
+- Health endpoints:
+  - `GET /healthz`
+  - `GET /readyz`
+
+## Optional presence snapshot persistence
+
+Set `PRESENCE_SNAPSHOT_PATH` (for example `/data/presence.json`) to persist presence state snapshots across process restarts for single-instance deployments.
+
+## Supabase integration (recommended MVP auth)
+
+You can secure the backend using Supabase access tokens without adding server-side JWT libraries.
+
+Set these environment variables:
+
+- `SUPABASE_URL` (e.g. `https://<project-ref>.supabase.co`)
+- `SUPABASE_ANON_KEY`
+
+When these are set:
+
+- REST endpoints require `Authorization: Bearer <supabase_access_token>`.
+- WebSocket `/ws` requires `token=<supabase_access_token>` query param.
+- The backend validates tokens by calling Supabase `GET /auth/v1/user`.
+
+Compatibility notes:
+
+- `AUTH_TOKEN` can still be set as an emergency/shared fallback.
+- If both `AUTH_TOKEN` and Supabase env vars are set, either valid credential is accepted.

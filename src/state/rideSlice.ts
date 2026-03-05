@@ -71,69 +71,90 @@ export const createRideSlice: StateCreator<
       return;
     }
 
-    await services.voice.init();
-    get().attachVoiceListener(handles);
+    try {
+      await services.voice.init();
+      get().attachVoiceListener(handles);
 
-    handles.unsubscribeHeadset = services.bluetooth.onHeadsetEvent((event) => {
-      handleHeadsetEvent(event, get());
-    });
-
-    handles.unsubscribeHelmet = services.bluetooth.onHelmetConnectionChange((connected) => {
-      set({ helmetConnected: connected });
-    });
-
-    await services.bluetooth.startAdvertising(riderId, preference === 'OPEN' ? 1 : 2);
-    handles.stopAdvertising = services.bluetooth.stopAdvertising;
-
-    await services.bluetooth.startScanning((beacon) => get().upsertRider(beacon));
-    handles.stopScanning = services.bluetooth.stopScanning;
-
-    services.analytics.startSession();
-    get().setRecording(true);
-
-    await services.location.startTracking(async (loc) => {
-      set({ lastLocation: formatLocation(loc.lat, loc.lon) });
-      services.analytics.onLocation(loc);
-      await services.apiClient.updatePresence({
-        riderId,
-        lat: loc.lat,
-        lon: loc.lon,
-        rideMode: preference === 'OPEN' ? 'OPEN' : 'FRIENDS_ONLY',
-        timestamp: Date.now(),
+      handles.unsubscribeHeadset = services.bluetooth.onHeadsetEvent((event) => {
+        handleHeadsetEvent(event, get());
       });
-    });
-    handles.stopLocation = services.location.stopTracking;
 
-    await services.imu.startIMUTracking((sample) => services.analytics.onIMUSample(sample));
-    handles.stopIMU = services.imu.stopIMUTracking;
+      handles.unsubscribeHelmet = services.bluetooth.onHelmetConnectionChange((connected) => {
+        set({ helmetConnected: connected });
+      });
 
-    handles.channelInterval = setInterval(async () => {
-      const response = await services.apiClient.getAssignedChannel(get().riderId);
-      const current = get().currentChannelId;
-      if (response.channelId !== current) {
-        if (response.channelId) {
-          await services.voice.joinChannel(response.channelId);
-          get().setChannel(response.channelId, true);
-        } else if (current) {
-          await services.voice.leaveChannel();
-          get().setChannel(null, false);
-        }
-      }
-    }, 5000);
+      await services.bluetooth.startAdvertising(riderId, preference === 'OPEN' ? 1 : 2);
+      handles.stopAdvertising = services.bluetooth.stopAdvertising;
 
-    handles.presenceInterval = setInterval(async () => {
-      const last = get().lastLocation;
-      if (last) {
-        const [lat, lon] = last.split(',').map((val) => parseFloat(val.trim()));
+      await services.bluetooth.startScanning((beacon) => get().upsertRider(beacon));
+      handles.stopScanning = services.bluetooth.stopScanning;
+
+      services.analytics.startSession();
+      get().setRecording(true);
+
+      await services.location.startTracking(async (loc) => {
+        set({ lastLocation: formatLocation(loc.lat, loc.lon) });
+        services.analytics.onLocation(loc);
         await services.apiClient.updatePresence({
           riderId,
-          lat,
-          lon,
+          lat: loc.lat,
+          lon: loc.lon,
           rideMode: preference === 'OPEN' ? 'OPEN' : 'FRIENDS_ONLY',
           timestamp: Date.now(),
         });
-      }
-    }, 8000);
+      });
+      handles.stopLocation = services.location.stopTracking;
+
+      await services.imu.startIMUTracking((sample) => services.analytics.onIMUSample(sample));
+      handles.stopIMU = services.imu.stopIMUTracking;
+
+      handles.channelInterval = setInterval(async () => {
+        const response = await services.apiClient.getAssignedChannel(get().riderId);
+        const current = get().currentChannelId;
+        if (response.channelId !== current) {
+          if (response.channelId) {
+            await services.voice.joinChannel(response.channelId);
+            get().setChannel(response.channelId, true);
+          } else if (current) {
+            await services.voice.leaveChannel();
+            get().setChannel(null, false);
+          }
+        }
+      }, 5000);
+
+      handles.presenceInterval = setInterval(async () => {
+        const last = get().lastLocation;
+        if (last) {
+          const [lat, lon] = last.split(',').map((val) => parseFloat(val.trim()));
+          await services.apiClient.updatePresence({
+            riderId,
+            lat,
+            lon,
+            rideMode: preference === 'OPEN' ? 'OPEN' : 'FRIENDS_ONLY',
+            timestamp: Date.now(),
+          });
+        }
+      }, 8000);
+    } catch (error) {
+      if (handles.channelInterval) clearInterval(handles.channelInterval);
+      if (handles.presenceInterval) clearInterval(handles.presenceInterval);
+      if (handles.unsubscribeHeadset) handles.unsubscribeHeadset();
+      if (handles.unsubscribeHelmet) handles.unsubscribeHelmet();
+      if (handles.unsubscribeVoice) handles.unsubscribeVoice();
+      if (handles.stopIMU) await handles.stopIMU();
+      if (handles.stopScanning) await handles.stopScanning();
+      if (handles.stopAdvertising) await handles.stopAdvertising();
+      if (handles.stopLocation) await handles.stopLocation();
+      await services.voice.leaveChannel();
+      get().setRecording(false);
+      set({
+        rideMode: 'IDLE',
+        ridePreference: null,
+        statusMessage: `Ride start failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        sessionHandles: null,
+      });
+      return;
+    }
 
     set({
       rideMode: preference === 'OPEN' ? 'ACTIVE_OPEN' : 'ACTIVE_FRIENDS_ONLY',

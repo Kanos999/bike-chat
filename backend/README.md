@@ -19,10 +19,10 @@ Node.js/TypeScript service that provides **presence**, **channel assignment**, a
   Returns the channel the rider should join, if any.
 
   - **Response:** `{ channelId: string | null }`
-  - **Behaviour:** A rider gets a non-null `channelId` only when **at least two riders** are in the same geohash cell and their ride modes are compatible:
-    - **OPEN:** any rider in the same cell can share a channel.
-    - **FRIENDS_ONLY:** only riders with `rideMode: 'FRIENDS_ONLY'` in the same cell are grouped.
-  - Channel id format: `channel-<geohash>` (e.g. `channel-9q8yy`).
+  - **Behaviour:** A rider gets a non-null `channelId` when at least two compatible riders are connected through proximity links of **<=150 m**.
+    - **OPEN:** can match any nearby rider in OPEN/FRIENDS_ONLY compatibility rules.
+    - **FRIENDS_ONLY:** only matches nearby riders in FRIENDS_ONLY mode.
+  - Channel id format: `channel-<geohash>` where the geohash is derived from the connected group centroid (stable, but not restricted to one geohash cell).
 
 So: clients **push** presence with `POST /presence`, and **poll** `GET /presence/channel` to know when to join/leave a channel. No authentication in this MVP.
 
@@ -192,9 +192,42 @@ Set the app’s base URL (e.g. in `src/config.ts` or via env) to your deployed h
 | Component        | Role                                                                 |
 |-----------------|----------------------------------------------------------------------|
 | **POST /presence** | Update rider location and mode; stored in memory with 90 s TTL.     |
-| **GET /presence/channel** | Return shared channel id when ≥2 riders in same geohash/mode.       |
+| **GET /presence/channel** | Return shared channel id when ≥2 compatible riders are connected within 150 m links. |
 | **Presence store** | In-memory map + geohash; pruned every 30 s.                         |
 | **WebSocket /ws**  | Join channel by `channelId`/`riderId`; relay offer/answer/ice.       |
 | **Single process** | One port (default 3000) for HTTP and WS.                            |
 
 **Best way to run a deployed version:** Run the compiled app (`npm run build && npm start`) on a **single, long-running host** (VPS, PaaS, or container), put a **reverse proxy** in front for HTTPS/WSS, and point the mobile app at that base URL.
+
+## Auth and readiness (MVP)
+
+- Optional shared-token auth is enabled by setting `AUTH_TOKEN`.
+  - REST: send `Authorization: Bearer <AUTH_TOKEN>`.
+  - WebSocket: append `&token=<AUTH_TOKEN>` to `/ws` URL.
+- Health endpoints:
+  - `GET /healthz`
+  - `GET /readyz`
+
+## Optional presence snapshot persistence
+
+Set `PRESENCE_SNAPSHOT_PATH` (for example `/data/presence.json`) to persist presence state snapshots across process restarts for single-instance deployments.
+
+## Supabase integration (recommended MVP auth)
+
+You can secure the backend using Supabase access tokens without adding server-side JWT libraries.
+
+Set these environment variables:
+
+- `SUPABASE_URL` (e.g. `https://<project-ref>.supabase.co`)
+- `SUPABASE_ANON_KEY`
+
+When these are set:
+
+- REST endpoints require `Authorization: Bearer <supabase_access_token>`.
+- WebSocket `/ws` requires `token=<supabase_access_token>` query param.
+- The backend validates tokens by calling Supabase `GET /auth/v1/user`.
+
+Compatibility notes:
+
+- `AUTH_TOKEN` can still be set as an emergency/shared fallback.
+- If both `AUTH_TOKEN` and Supabase env vars are set, either valid credential is accepted.

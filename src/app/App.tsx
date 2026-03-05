@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import HomeScreen from '../screens/HomeScreen';
 import RideSummaryScreen from '../screens/RideSummaryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import LoginScreen from '../screens/LoginScreen';
 import { config } from '../config';
 import { services } from '../modules/services';
 import { loadProfile } from '../state/profileStorage';
@@ -33,6 +34,11 @@ const App = () => {
   const [screen, setScreen] = useState<ScreenName>('Home');
   const [params, setParams] = useState<RootStackParamList[ScreenName]>(undefined);
   const [history, setHistory] = useState<ScreenName[]>(['Home']);
+  const { authReady, session, initializeAuth } = useAppStore((state) => ({
+    authReady: state.authReady,
+    session: state.session,
+    initializeAuth: state.initializeAuth,
+  }));
 
   const navigation: AppNavigation = React.useMemo(
     () => ({
@@ -62,14 +68,32 @@ const App = () => {
   useEffect(() => {
     config.riderIdGetter = () => useAppStore.getState().riderId;
   }, []);
+
+  useEffect(() => {
+    void initializeAuth();
+  }, [initializeAuth]);
+
   useEffect(() => {
     loadProfile().then((profile) => useAppStore.getState().hydrateProfile(profile));
   }, []);
+
   useEffect(() => {
     services.analytics.getLastSummary().then((summary) => {
       if (summary) useAppStore.getState().setLastSummary(summary);
     });
   }, []);
+
+  if (!authReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (!session) {
+    return <LoginScreen />;
+  }
 
   const renderScreen = () => {
     switch (screen) {

@@ -5,8 +5,9 @@ import { createAnalyticsSlice, AnalyticsSlice } from './analyticsSlice';
 import { createProximitySlice, ProximitySlice } from './proximitySlice';
 import { createRideSlice, RideSlice } from './rideSlice';
 import { createVoiceSlice, VoiceSlice } from './voiceSlice';
+import { createAuthSlice, AuthSlice } from './authSlice';
 
-export type AppState = RideSlice & ProximitySlice & VoiceSlice & AnalyticsSlice;
+export type AppState = RideSlice & ProximitySlice & VoiceSlice & AnalyticsSlice & AuthSlice;
 
 const withDevtools = <T>(creator: StateCreator<T>) => devtools(creator, { name: 'BikeChatStore' });
 
@@ -16,5 +17,6 @@ export const useAppStore = create<AppState>()(
     ...createProximitySlice(set, get, api),
     ...createVoiceSlice(set, get, api),
     ...createAnalyticsSlice(set, get, api),
+    ...createAuthSlice(set, get, api),
   })),
 );

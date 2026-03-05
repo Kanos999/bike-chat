@@ -10,11 +10,11 @@ Follow these steps to get the backend running in production.
 cd backend
 npm ci
 npm run build
-PORT=3000 npm start
+PORT=3001 npm start
 ```
 
-You should see: `API + WebSocket listening on http://localhost:3000`.  
-Test: `curl -X POST http://localhost:3000/presence -H "Content-Type: application/json" -d '{"riderId":"r1","lat":0,"lon":0}'` → 204.
+You should see: `API + WebSocket listening on http://localhost:3001`.  
+Test: `curl -X POST http://localhost:3001/presence -H "Content-Type: application/json" -d '{"riderId":"r1","lat":0,"lon":0}'` → 204.
 
 ---
 
@@ -29,7 +29,7 @@ Test: `curl -X POST http://localhost:3000/presence -H "Content-Type: application
 
 | Variable | Description |
 |----------|-------------|
-| `PORT`   | Port the server listens on (default `3000`). Many PaaS set this automatically. |
+| `PORT`   | Port the server listens on (default `3001`). Many PaaS set this automatically. |
 
 No secrets required for the current MVP.
 
@@ -52,7 +52,7 @@ From the **repo root**:
 
 ```bash
 docker build -f backend/Dockerfile -t bike-chat-backend ./backend
-docker run -p 3000:3000 -e PORT=3000 --name bike-chat-backend -d bike-chat-backend
+docker run -p 3001:3001 -e PORT=3001 --name bike-chat-backend -d bike-chat-backend
 ```
 
 To use a different port (e.g. 8080):
@@ -86,7 +86,7 @@ docker run -p 8080:8080 -e PORT=8080 --name bike-chat-backend -d bike-chat-backe
    Type=simple
    User=www-data
    WorkingDirectory=/var/www/bike-chat-backend
-   Environment=PORT=3000
+   Environment=PORT=3001
    ExecStart=/usr/bin/node dist/index.js
    Restart=on-failure
    RestartSec=5
@@ -108,14 +108,14 @@ docker run -p 8080:8080 -e PORT=8080 --name bike-chat-backend -d bike-chat-backe
 - **PaaS:** Use the provided HTTPS URL; WebSocket works over `wss://` on the same host.
 - **VPS / Docker:** Put a reverse proxy (Nginx or Caddy) in front:
   - Listen on 80/443 and terminate TLS.
-  - Proxy HTTP and WebSocket to `http://localhost:3000` (or the port the app uses).
+   - Proxy HTTP and WebSocket to `http://localhost:3001` (or the port the app uses).
   - WebSocket: enable `Upgrade` and `Connection` headers; proxy `GET /ws` to the same backend.
 
 Example Nginx location (inside a `server` block with `ssl` already configured):
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:3000;
+   proxy_pass http://127.0.0.1:3001;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -124,7 +124,7 @@ location / {
 }
 ```
 
-- **Firewall:** Open 80 and 443 (and SSH if needed). Do **not** expose 3000 to the internet if you use a proxy.
+- **Firewall:** Open 80 and 443 (and SSH if needed). Do **not** expose 3001 to the internet if you use a proxy.
 
 ---
 
@@ -148,7 +148,7 @@ Update `src/config.ts` (or use env) so `apiBaseUrl` and `wsBaseUrl` use this hos
 | Step              | Action |
 |-------------------|--------|
 | Build             | `npm ci && npm run build` |
-| Run               | `npm start` (or `PORT=3000 npm start`) |
+| Run               | `npm start` (or `PORT=3001 npm start`) |
 | Docker build      | `docker build -f backend/Dockerfile -t bike-chat-backend ./backend` |
-| Docker run        | `docker run -p 3000:3000 -e PORT=3000 -d bike-chat-backend` |
+| Docker run        | `docker run -p 3001:3001 -e PORT=3001 -d bike-chat-backend` |
 | Health check      | `curl -s -o /dev/null -w "%{http_code}" https://your-host/presence/channel?riderId=test` → 200 |

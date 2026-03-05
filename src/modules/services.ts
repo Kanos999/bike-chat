@@ -29,9 +29,17 @@ export interface Services {
   };
 }
 
-const useRealApi = typeof __DEV__ !== 'undefined' && __DEV__;
-const useRealLocation = typeof __DEV__ !== 'undefined' && __DEV__;
-const useRealVoice = typeof __DEV__ !== 'undefined' && __DEV__;
+const globals = global as unknown as {
+  __BikeChatUseMockApi?: boolean;
+  __BikeChatUseMockLocation?: boolean;
+  __BikeChatUseMockVoice?: boolean;
+};
+
+// Default to real implementations in all builds.
+// Opt into mocks explicitly via globals for demos/tests.
+const useRealApi = !globals.__BikeChatUseMockApi;
+const useRealLocation = !globals.__BikeChatUseMockLocation;
+const useRealVoice = !globals.__BikeChatUseMockVoice;
 const realIMU = getRealIMUModule();
 const realBle = getRealBluetoothModule();
 
@@ -40,6 +48,15 @@ const location = useRealLocation ? createRealLocationModule() : createMockLocati
 const imu: IMUModule = realIMU ?? createMockIMUModule();
 const voice: VoiceModule = useRealVoice ? createWebRTCVoiceModule() : createMockVoiceModule();
 const apiClient: ApiClient = useRealApi ? createRealApiClient() : createMockApiClient();
+
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  // eslint-disable-next-line no-console
+  console.log('[services] api=', useRealApi ? 'real' : 'mock');
+  // eslint-disable-next-line no-console
+  console.log('[services] location=', useRealLocation ? 'real' : 'mock');
+  // eslint-disable-next-line no-console
+  console.log('[services] voice=', useRealVoice ? 'real' : 'mock');
+}
 
 export const services: Services = {
   bluetooth,

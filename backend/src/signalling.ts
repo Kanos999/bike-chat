@@ -13,6 +13,8 @@ type SignallingMessage =
 
 const channelMembers = new Map<string, Set<string>>();
 
+const logWs = !['0', 'false', 'no', 'off'].includes(String(process.env.WS_LOGS ?? '').toLowerCase());
+
 function getMembers(channelId: string): string[] {
   const set = channelMembers.get(channelId);
   return set ? Array.from(set) : [];
@@ -26,6 +28,14 @@ export function startSignallingServer(server: import('http').Server, auth: AuthC
     const channelId = url.searchParams.get('channelId') ?? '';
     const riderId = url.searchParams.get('riderId') ?? '';
     const token = url.searchParams.get('token');
+
+    if (logWs) {
+      console.log('[ws] connection', {
+        channelId,
+        riderId,
+        hasToken: Boolean(token),
+      });
+    }
 
     if (!channelId || !riderId) {
       ws.close(4000, 'channelId and riderId required');
@@ -63,6 +73,7 @@ export function startSignallingServer(server: import('http').Server, auth: AuthC
       });
 
       ws.on('close', () => {
+        if (logWs) console.log('[ws] close', { channelId, riderId });
         const membersSet = channelMembers.get(channelId);
         membersSet?.delete(riderId);
         if (membersSet && membersSet.size === 0) {

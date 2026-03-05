@@ -38,6 +38,11 @@ export const createRealLocationModule = (): LocationModule => {
   const startTracking = async (onLocation: (loc: Location) => void): Promise<void> => {
     if (watchId != null) return;
 
+    const androidExtraOptions =
+      Platform.OS === 'android'
+        ? ({ showLocationDialog: true, forceRequestLocation: true } as any)
+        : {};
+
     const reportPosition = (position: GeolocationResponse): void => {
       const { latitude, longitude, speed, heading } = position.coords;
       const loc: Location = {
@@ -53,14 +58,35 @@ export const createRealLocationModule = (): LocationModule => {
     // or never fire indoors; without this, lastLocation stays null and no presence is sent.
     Geolocation.getCurrentPosition(
       reportPosition,
-      (err) => console.warn('[geolocation] getCurrentPosition', err),
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+      (err) => {
+        console.warn('[geolocation] getCurrentPosition', err);
+        // If we didn't get a fast/cached fix, retry once with high accuracy and a longer timeout.
+        // This helps on emulators and on devices that need to warm up GPS.
+        if (err?.code === 2 || err?.code === 3) {
+          Geolocation.getCurrentPosition(
+            reportPosition,
+            (err2) => console.warn('[geolocation] getCurrentPosition(highAccuracy)', err2),
+            {
+              enableHighAccuracy: true,
+              timeout: 60000,
+              maximumAge: 0,
+              ...androidExtraOptions,
+            } as any
+          );
+        }
+      },
+      {
+        enableHighAccuracy: Platform.OS === 'android',
+        timeout: 30000,
+        maximumAge: 60000,
+        ...androidExtraOptions,
+      } as any
     );
 
     watchId = Geolocation.watchPosition(
       reportPosition,
       (err) => console.warn('[geolocation] watchPosition', err),
-      { enableHighAccuracy: true, distanceFilter: 10 }
+      ({ enableHighAccuracy: true, distanceFilter: 10, ...androidExtraOptions } as any)
     );
   };
 
@@ -74,6 +100,10 @@ export const createRealLocationModule = (): LocationModule => {
   const requestPermissions = async (): Promise<boolean> => {
     const androidOk = await requestAndroidLocationPermission();
     if (!androidOk) return false;
+
+    // `requestAuthorization` is iOS-only; on Android the runtime permission prompt above is sufficient.
+    if (Platform.OS === 'android') return true;
+
     return new Promise((resolve) => {
       Geolocation.requestAuthorization(
         () => resolve(true),

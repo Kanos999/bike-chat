@@ -318,9 +318,9 @@ In **development** (`__DEV__`), the app uses real API, location, voice signallin
   cd backend && npm install && npm run dev
   ```
 
-  The API + WebSocket run on `http://localhost:3000` (API at `/presence`, WebSocket at `/ws`).
+  The API + WebSocket run on `http://localhost:3001` (API at `/presence`, WebSocket at `/ws`).
 
-- On the **Android emulator**, the app is configured to use `http://10.0.2.2:3000` as the API/WS base (10.0.2.2 is the host machine’s localhost). No code change needed.
+- On the **Android emulator**, the app is configured to use `http://10.0.2.2:3001` as the API/WS base (10.0.2.2 is the host machine’s localhost). No code change needed.
 
 - **Location:** Grant location permission when prompted. The app uses `@react-native-community/geolocation` with high accuracy and a 10 m distance filter.
 

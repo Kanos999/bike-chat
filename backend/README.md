@@ -40,7 +40,7 @@ So: clients **push** presence with `POST /presence`, and **poll** `GET /presence
 - **Purpose:** After the app learns a `channelId` from `GET /presence/channel`, it opens a WebSocket to exchange WebRTC signalling messages (offer, answer, ICE candidates) with other riders in that channel.
 - **URL:** Same host as the API, path `/ws`. Query params: **`channelId`** and **`riderId`** (required).
 
-  Example: `ws://your-server:3000/ws?channelId=channel-9q8yy&riderId=rider-123`
+  Example: `ws://your-server:3001/ws?channelId=channel-9q8yy&riderId=rider-123`
 
 - **On connect:** The server adds the client to the channel’s member set and sends a **`joined`** message: `{ type: 'joined', channelId, members }` (other members’ `riderId`s).
 - **Relay:** Clients send JSON messages with `type: 'offer' | 'answer' | 'ice'` and `from`, `to`, plus `sdp` or `candidate`. The server forwards these only to the WebSocket client whose `riderId` equals `to`.
@@ -51,7 +51,7 @@ So the backend does **not** handle media; it only relays signalling so peers can
 ### 4. Single server, one port
 
 - `src/api.ts` creates an `http.Server` from the Express app, then attaches the **ws** WebSocket server to the same server with `path: '/ws'`.
-- All traffic is on one port (default **3000**): HTTP for REST, WebSocket for `/ws`.
+- All traffic is on one port (default **3001**): HTTP for REST, WebSocket for `/ws`.
 - **CORS** is enabled for the REST API so browser or mobile clients can call it from other origins.
 
 ---
@@ -82,7 +82,7 @@ npm install
 
 ### Environment
 
-- **`PORT`** – Port to listen on. Default: `3000`.
+- **`PORT`** – Port to listen on. Default: `3001`.
 
   Example: `PORT=3001 npm run dev`
 
@@ -116,7 +116,7 @@ Run the backend on a small Linux VM (e.g. DigitalOcean, Linode, EC2).
      Type=simple
      User=www-data
      WorkingDirectory=/var/www/bike-chat-backend
-     Environment=PORT=3000
+    Environment=PORT=3001
      ExecStart=/usr/bin/node dist/index.js
      Restart=on-failure
      RestartSec=5
@@ -131,9 +131,9 @@ Run the backend on a small Linux VM (e.g. DigitalOcean, Linode, EC2).
      and `pm2 save` + `pm2 startup` for persistence.
 4. **Reverse proxy (recommended):** Put Nginx (or Caddy) in front so you can use HTTPS and a domain:
    - Terminate TLS at the proxy.
-   - Proxy `http://localhost:3000` for both HTTP and WebSocket (e.g. `proxy_http_version 1.1`, `Upgrade`, `Connection` for `/ws`).
-   - Clients then use `https://your-domain.com` (and `wss://your-domain.com/ws`) instead of opening port 3000 to the internet.
-5. **Firewall:** Allow 80/443 (and optionally SSH); do not expose 3000 publicly if you use a proxy.
+  - Proxy `http://localhost:3001` for both HTTP and WebSocket (e.g. `proxy_http_version 1.1`, `Upgrade`, `Connection` for `/ws`).
+  - Clients then use `https://your-domain.com` (and `wss://your-domain.com/ws`) instead of opening port 3001 to the internet.
+5. **Firewall:** Allow 80/443 (and optionally SSH); do not expose 3001 publicly if you use a proxy.
 
 ### Option B: PaaS (Railway, Render, Fly.io, etc.)
 
@@ -152,7 +152,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY . .
 RUN npm run build
-EXPOSE 3000
+EXPOSE 3001
 CMD ["node", "dist/index.js"]
 ```
 
@@ -160,7 +160,7 @@ Build and run:
 
 ```bash
 docker build -t bike-chat-backend ./backend
-docker run -p 3000:3000 -e PORT=3000 bike-chat-backend
+docker run -p 3001:3001 -e PORT=3001 bike-chat-backend
 ```
 
 Use the same image behind a reverse proxy or in Kubernetes; set `PORT` as required by the environment.
@@ -183,7 +183,7 @@ Point the mobile app at the **deployed** backend:
 - **REST base URL:** `https://your-domain.com` (no trailing slash). The app will call `POST /presence` and `GET /presence/channel?riderId=...`.
 - **WebSocket URL:** `wss://your-domain.com/ws?channelId=...&riderId=...` (same host, path `/ws`, TLS in production).
 
-Set the app’s base URL (e.g. in `src/config.ts` or via env) to your deployed host so it uses that instead of `http://10.0.2.2:3000` in development.
+Set the app’s base URL (e.g. in `src/config.ts` or via env) to your deployed host so it uses that instead of `http://10.0.2.2:3001` in development.
 
 ---
 
@@ -194,8 +194,8 @@ Set the app’s base URL (e.g. in `src/config.ts` or via env) to your deployed h
 | **POST /presence** | Update rider location and mode; stored in memory with 90 s TTL.     |
 | **GET /presence/channel** | Return shared channel id when ≥2 compatible riders are connected within 150 m links. |
 | **Presence store** | In-memory map + geohash; pruned every 30 s.                         |
-| **WebSocket /ws**  | Join channel by `channelId`/`riderId`; relay offer/answer/ice.       |
-| **Single process** | One port (default 3000) for HTTP and WS.                            |
+  | **WebSocket /ws**  | Join channel by `channelId`/`riderId`; relay offer/answer/ice.       |
+  | **Single process** | One port (default 3001) for HTTP and WS.                            |
 
 **Best way to run a deployed version:** Run the compiled app (`npm run build && npm start`) on a **single, long-running host** (VPS, PaaS, or container), put a **reverse proxy** in front for HTTPS/WSS, and point the mobile app at that base URL.
 

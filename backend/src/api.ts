@@ -15,6 +15,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const logRequests = !['0', 'false', 'no', 'off'].includes(String(process.env.REQUEST_LOGS ?? '').toLowerCase());
+
 const auth = createAuthContextFromEnv();
 
 async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -39,6 +41,12 @@ app.get('/readyz', (_req, res) => {
 });
 
 app.post('/presence', authMiddleware, async (req, res) => {
+  if (logRequests) {
+    console.log('[http] POST /presence', {
+      riderId: (req.body as any)?.riderId,
+      hasAuth: Boolean(req.headers.authorization),
+    });
+  }
   const body = req.body as Partial<PresenceUpdate>;
   if (!body?.riderId || typeof body.lat !== 'number' || typeof body.lon !== 'number') {
     return res.status(400).json({ error: 'Invalid presence: need riderId, lat, lon' });
@@ -55,6 +63,12 @@ app.post('/presence', authMiddleware, async (req, res) => {
 });
 
 app.get('/presence/channel', authMiddleware, async (req, res) => {
+  if (logRequests) {
+    console.log('[http] GET /presence/channel', {
+      riderId: req.query.riderId,
+      hasAuth: Boolean(req.headers.authorization),
+    });
+  }
   const riderId = req.query.riderId as string;
   if (!riderId) {
     return res.status(400).json({ error: 'Missing riderId query' });
@@ -63,7 +77,7 @@ app.get('/presence/channel', authMiddleware, async (req, res) => {
   res.json({ channelId });
 });
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
 export async function startApi(): Promise<void> {
   await configurePresenceStore(process.env.PRESENCE_SNAPSHOT_PATH);

@@ -17,7 +17,7 @@ This update now includes a concrete **Supabase integration path** for authorizat
    - Presence store supports **optional file-backed snapshots** (`PRESENCE_SNAPSHOT_PATH`) so state can survive process restart in simple deployments.
 
 4. **Config safety improved**
-   - Client dev base URL default uses Android emulator-safe `http://10.0.2.2:3000` instead of a hardcoded LAN IP.
+   - Client dev base URL default uses Android emulator-safe `http://10.0.2.2:3001` instead of a hardcoded LAN IP.
    - Client supports global auth token wiring through `__BikeChatAuthToken` and `__BikeChatSupabaseAccessToken`.
 
 5. **Authorization added (Supabase-enabled MVP)**

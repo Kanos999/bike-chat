@@ -6,6 +6,7 @@ const SESSION_KEY = 'bikechat.supabase.session';
 export interface SupabaseUser {
   id: string;
   email?: string;
+  phone?: string;
 }
 
 export interface SupabaseSession {
@@ -51,30 +52,126 @@ async function loadStoredSession(): Promise<SupabaseSession | null> {
 }
 
 async function requestSession(path: string, body: object): Promise<SupabaseSession> {
-  const res = await fetch(`${baseAuthUrl()}${path}`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json()) as Record<string, unknown>;
+  const url = `${baseAuthUrl()}${path}`;
+  const controller = new AbortController();
+  const timeoutMs = 15000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const isAbort =
+      (error instanceof Error && error.name === 'AbortError') ||
+      String((error as any)?.name ?? '').toLowerCase().includes('abort');
+    const baseMessage = isAbort
+      ? `Timed out after ${timeoutMs}ms reaching Supabase.`
+      : 'Network request failed reaching Supabase.';
+
+    // React Native often throws TypeError('Network request failed') with no extra details.
+    // Provide likely causes that match real-world RN failures.
+    throw new Error(
+      `${baseMessage} URL: ${url}. ` +
+        'Check device/emulator internet access, VPN/proxy/firewall, and correct system time (TLS).'
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    data = {};
+  }
   if (!res.ok) {
-    const message = typeof data.msg === 'string' ? data.msg : `Supabase auth failed (${res.status})`;
+    const message =
+      (typeof data.msg === 'string' && data.msg) ||
+      (typeof (data as any).error_description === 'string' && (data as any).error_description) ||
+      (typeof (data as any).error === 'string' && (data as any).error) ||
+      `Supabase auth failed (${res.status})`;
     throw new Error(message);
   }
   if (!data.access_token || !data.refresh_token || !data.user) {
+    console.log('Unexpected Supabase auth response:', data);
     throw new Error('Unexpected Supabase auth response');
   }
   return data as unknown as SupabaseSession;
 }
 
-export async function signInWithEmail(email: string, password: string): Promise<SupabaseSession> {
-  const session = await requestSession('/token?grant_type=password', { email, password });
-  await saveSession(session);
-  return session;
+async function requestJson(path: string, body: object): Promise<Record<string, unknown>> {
+  const url = `${baseAuthUrl()}${path}`;
+  const controller = new AbortController();
+  const timeoutMs = 15000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const isAbort =
+      (error instanceof Error && error.name === 'AbortError') ||
+      String((error as any)?.name ?? '').toLowerCase().includes('abort');
+    const baseMessage = isAbort
+      ? `Timed out after ${timeoutMs}ms reaching Supabase.`
+      : 'Network request failed reaching Supabase.';
+    throw new Error(
+      `${baseMessage} URL: ${url}. ` +
+        'Check device/emulator internet access, VPN/proxy/firewall, and correct system time (TLS).'
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    data = {};
+  }
+
+  if (!res.ok) {
+    const message =
+      (typeof data.msg === 'string' && data.msg) ||
+      (typeof (data as any).error_description === 'string' && (data as any).error_description) ||
+      (typeof (data as any).error === 'string' && (data as any).error) ||
+      `Supabase request failed (${res.status})`;
+    throw new Error(message);
+  }
+
+  return data;
 }
 
-export async function signUpWithEmail(email: string, password: string): Promise<SupabaseSession> {
-  const session = await requestSession('/signup', { email, password });
+export async function requestSmsOtp(phone: string): Promise<void> {
+  const normalized = phone.trim();
+  if (!normalized) throw new Error('Enter a phone number');
+  // Supabase expects E.164 format ideally (e.g. +61400111222)
+  await requestJson('/otp', {
+    phone: normalized,
+    options: { shouldCreateUser: true },
+  });
+}
+
+export async function verifySmsOtp(phone: string, code: string): Promise<SupabaseSession> {
+  const normalizedPhone = phone.trim();
+  const normalizedCode = code.trim();
+  if (!normalizedPhone) throw new Error('Enter a phone number');
+  if (!normalizedCode) throw new Error('Enter the SMS code');
+  const session = await requestSession('/verify', {
+    type: 'sms',
+    phone: normalizedPhone,
+    token: normalizedCode,
+  });
   await saveSession(session);
   return session;
 }

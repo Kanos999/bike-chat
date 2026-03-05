@@ -1,10 +1,10 @@
 import { StateCreator } from 'zustand';
 import {
   getValidSession,
-  signInWithEmail,
+  requestSmsOtp,
   signOut,
-  signUpWithEmail,
   SupabaseSession,
+  verifySmsOtp,
 } from '../modules/auth/supabaseAuth';
 
 export interface AuthSlice {
@@ -13,8 +13,8 @@ export interface AuthSlice {
   authError: string | null;
   session: SupabaseSession | null;
   initializeAuth: () => Promise<void>;
-  loginWithEmail: (email: string, password: string) => Promise<void>;
-  signupWithEmail: (email: string, password: string) => Promise<void>;
+  requestPhoneOtp: (phone: string) => Promise<void>;
+  verifyPhoneOtp: (phone: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -48,25 +48,24 @@ export const createAuthSlice: StateCreator<
       });
     }
   },
-  loginWithEmail: async (email, password) => {
+  requestPhoneOtp: async (phone) => {
     set({ authLoading: true, authError: null });
     try {
-      const session = await signInWithEmail(email, password);
-      applySessionToGlobals(session);
-      set({ session, authLoading: false });
+      await requestSmsOtp(phone);
+      set({ authLoading: false });
     } catch (error) {
-      set({ authLoading: false, authError: error instanceof Error ? error.message : 'Login failed' });
+      set({ authLoading: false, authError: error instanceof Error ? error.message : 'OTP request failed' });
       throw error;
     }
   },
-  signupWithEmail: async (email, password) => {
+  verifyPhoneOtp: async (phone, code) => {
     set({ authLoading: true, authError: null });
     try {
-      const session = await signUpWithEmail(email, password);
+      const session = await verifySmsOtp(phone, code);
       applySessionToGlobals(session);
       set({ session, authLoading: false });
     } catch (error) {
-      set({ authLoading: false, authError: error instanceof Error ? error.message : 'Signup failed' });
+      set({ authLoading: false, authError: error instanceof Error ? error.message : 'OTP verification failed' });
       throw error;
     }
   },

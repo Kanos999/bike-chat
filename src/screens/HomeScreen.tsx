@@ -169,32 +169,50 @@ const HomeScreen = ({ navigation }: { navigation: AppNavigation }) => {
   );
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View className="flex-grow pb-8 bg-bike-bg">
-      <View className="flex-row mb-6">
+    <View className="absolute h-full w-full pb-8 bg-bike-bg">
+      
+      {/* Status bar header */}
+      <View className={`absolute top-0 left-0 right-0 mb-10 backdrop-blur-sm border-b border-bike-border px-6 py-3 ${rideMode === "ACTIVE_OPEN" ? "bg-bike-orange-bright/80" : "bg-bike-bg/80"}`}>
+        <Text className={`text-md font-bold tracking-wide ${rideMode === "ACTIVE_OPEN" ? "text-white" : "text-bike-text-muted"}`}>
+          {rideMode === "ACTIVE_OPEN" ? "Proximity chat active" : "Proximity chat inactive"}
+        </Text>
+      </View>
+
+      <AudioSpectrumVisualizer
+        level={inputLevel}
+        muted={localMuted}
+        barColor="#ff6600"
+      />
+
+      {/* We'll make it open for now */}
+      {/* <View className="flex-row m-4 p-2 bg-bike-card rounded-lg">
         <TouchableOpacity
-          className={`flex-1 py-3.5 items-center justify-center border ${modePreference === 'OPEN' ? 'bg-bike-card/80 border-bike-orange' : 'border-bike-border-orange'}`}
+          className={`flex-1 py-3.5 items-center rounded-md justify-center ${modePreference === 'OPEN' ? 'bg-white' : ''}`}
           onPress={() => setModePreference('OPEN')}
           activeOpacity={0.8}
         >
-          <Text className={`text-base font-semibold tracking-wide ${modePreference === 'OPEN' ? 'text-bike-orange-bright' : 'text-bike-text-dim'}`}>
+          <Text 
+            className={`text-base font-bold tracking-wide ${modePreference === 'OPEN' ? 'text-black' : 'text-white'}`}
+            style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
             Open
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          className={`flex-1 py-3.5 items-center justify-center border ${modePreference === 'FRIENDS_ONLY' ? 'bg-bike-card/80 border-bike-orange' : 'border-bike-border-orange'}`}
+          className={`flex-1 py-3.5 items-center rounded-md justify-center ${modePreference === 'FRIENDS_ONLY' ? 'bg-white' : ''}`}
           onPress={() => setModePreference('FRIENDS_ONLY')}
           activeOpacity={0.8}
         >
-          <Text className={`text-base font-semibold tracking-wide ${modePreference === 'FRIENDS_ONLY' ? 'text-bike-orange-bright' : 'text-bike-text-dim'}`}>
+          <Text 
+            className={`text-base font-bold tracking-wide ${modePreference === 'FRIENDS_ONLY' ? 'text-black' : 'text-white'}`}
+            style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
             Friends
           </Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
 
       {nearbyRiders.length > 0 && (
         <View className="mb-6">
-          <Text className="text-sm font-semibold text-bike-orange-muted mb-3 px-6 tracking-widest">
+          <Text className="text-sm font-semibold text-bike-orange-muted m-3 px-6 tracking-widest">
             Nearby riders
           </Text>
           <ScrollView
@@ -211,15 +229,11 @@ const HomeScreen = ({ navigation }: { navigation: AppNavigation }) => {
       )}
 
       <View className="px-6">
-        <Text className="text-base text-bike-text-muted mb-0.5 tracking-wide">Ride mode: {rideMode}</Text>
-        {statusMessage ? (
-          <Text className="text-sm text-bike-orange-bright mb-5 tracking-wide">{statusMessage}</Text>
-        ) : null}
 
         <View className="items-center mb-2">
           {isRiding ? (
             <TouchableOpacity
-              className="min-w-[240px] min-h-[240px] py-4 px-12 bg-bike-card rounded-[120px] items-center justify-center border-2 border-bike-orange"
+              className="min-w-[240px] min-h-[240px] py-4 px-12 bg-bike-card rounded-[120px] items-center justify-center border-2 border-bike-orange-bright"
               onPress={endRide}
               activeOpacity={0.85}
             >
@@ -309,8 +323,7 @@ const HomeScreen = ({ navigation }: { navigation: AppNavigation }) => {
           </View>
         </View>
       </View>
-      </View>
-    </ScrollView>
+    </View>
   );
 };
 

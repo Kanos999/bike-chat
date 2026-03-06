@@ -48,14 +48,14 @@ const LoginScreen = () => {
   return (
     <View className="flex-1 bg-bike-bg px-6 justify-center">
       <Text
-        className="text-3xl font-bold text-bike-text mb-2"
+        className="text-3xl font-black text-bike-text mb-2"
         style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}
       >
         Bike Chat
       </Text>
       <Text className="text-bike-text-dim mb-6">Sign in with your phone number.</Text>
 
-      <View className="bg-bike-orange p-1 relative rounded-sm mb-3">
+      <View className="bg-white p-1 relative rounded-sm mb-3">
         <View className="absolute top-0 bottom-0 left-3 right-3 z-10 bg-bike-bg" />
         <TextInput
           className="text-base text-bike-text py-3 px-3 z-20 bg-bike-bg rounded-sm"

@@ -9,12 +9,12 @@ module.exports = {
     extend: {
       colors: {
         bike: {
-          bg: '#0a0908',
-          card: '#161210',
+          bg: '#101010',
+          card: '#1c1c1c',
           border: '#2a221c',
           'border-orange': '#4a3020',
           orange: '#ff6600',
-          'orange-bright': '#ff8833',
+          'orange-bright': '#fe5a24',
           'orange-muted': '#cc7733',
           'orange-dim': '#8b5a2b',
           text: '#e8e0d8',

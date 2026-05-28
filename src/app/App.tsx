@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import HomeScreen from '../screens/HomeScreen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import MainScreen from '../screens/MainScreen';
 import RideSummaryScreen from '../screens/RideSummaryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -30,15 +31,13 @@ export type AppNavigation = {
   goBack: () => void;
 };
 
-const App = () => {
+const AppInner = () => {
   const [screen, setScreen] = useState<ScreenName>('Home');
   const [params, setParams] = useState<RootStackParamList[ScreenName]>(undefined);
   const [history, setHistory] = useState<ScreenName[]>(['Home']);
-  const { authReady, session, initializeAuth } = useAppStore((state) => ({
-    authReady: state.authReady,
-    session: state.session,
-    initializeAuth: state.initializeAuth,
-  }));
+  const authReady = useAppStore((state) => state.authReady);
+  const session = useAppStore((state) => state.session);
+  const initializeAuth = useAppStore((state) => state.initializeAuth);
 
   const navigation: AppNavigation = React.useMemo(
     () => ({
@@ -98,17 +97,23 @@ const App = () => {
   const renderScreen = () => {
     switch (screen) {
       case 'Home':
-        return <HomeScreen navigation={navigation} />;
+        return <MainScreen navigation={navigation} />;
       case 'RideSummary':
         return <RideSummaryScreen navigation={navigation} route={{ params: params as RootStackParamList['RideSummary'] }} />;
       case 'Settings':
         return <SettingsScreen navigation={navigation} />;
       default:
-        return <HomeScreen navigation={navigation} />;
+        return <MainScreen navigation={navigation} />;
     }
   };
 
   return <View style={{ flex: 1 }}>{renderScreen()}</View>;
 };
+
+const App = () => (
+  <SafeAreaProvider>
+    <AppInner />
+  </SafeAreaProvider>
+);
 
 export default App;

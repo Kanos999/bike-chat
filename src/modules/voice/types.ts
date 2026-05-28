@@ -13,6 +13,7 @@ export interface VoiceModule {
   setGlobalMute(muted: boolean): Promise<void>;
   getState(): IntercomState;
   onStateChange(listener: (state: IntercomState) => void): () => void;
+  onPeersChange?(listener: (peerIds: string[]) => void): () => void;
   /** Subscribe to input (mic) level 0–1 for visualizer. Returns unsubscribe. */
   subscribeToInputLevel?(callback: (level: number) => void): () => void;
 }

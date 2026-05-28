@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bike Chat Dev Harness</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111315;
+        --panel: #1a1d21;
+        --panel-2: #22262b;
+        --line: #343942;
+        --text: #f3f5f7;
+        --muted: #9ba3ad;
+        --accent: #ff6a00;
+        --accent-2: #ff9a3c;
+        --ok: #29c56b;
+        --warn: #ffd166;
+        --bad: #ff6b6b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        background:
+          radial-gradient(circle at top right, rgba(255, 106, 0, 0.18), transparent 32%),
+          radial-gradient(circle at bottom left, rgba(41, 197, 107, 0.12), transparent 28%),
+          var(--bg);
+        color: var(--text);
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+      }
+
+      p {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+      }
+
+      .panel {
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)), var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: 0 14px 50px rgba(0, 0, 0, 0.22);
+      }
+
+      .panel h2 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 16px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--accent-2);
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      input,
+      select,
+      button,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 320px;
+        resize: vertical;
+      }
+
+      button {
+        cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+      }
+
+      button.primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #130900;
+        border: none;
+        font-weight: 700;
+      }
+
+      button.ghost {
+        background: transparent;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+      }
+
+      .stat {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+      }
+
+      .value {
+        font-size: 14px;
+        font-weight: 700;
+        word-break: break-word;
+      }
+
+      .ok { color: var(--ok); }
+      .warn { color: var(--warn); }
+      .bad { color: var(--bad); }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .actions button {
+        width: auto;
+        min-width: 140px;
+      }
+
+      .audio-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      audio {
+        width: 100%;
+      }
+
+      .hint {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Bike Chat Rider Harness</h1>
+      <p>
+        Use this page as another rider from your laptop browser. It can send presence updates,
+        auto-join the assigned channel, and participate in WebRTC audio so one Android phone is
+        enough to test matching and voice end to end.
+      </p>
+
+      <div class="grid">
+        <section class="panel">
+          <h2>Rider Config</h2>
+
+          <div class="row">
+            <label>
+              Rider ID
+              <input id="riderId" value="browser-rider-1" />
+            </label>
+            <label>
+              Ride Mode
+              <select id="rideMode">
+                <option value="OPEN">OPEN</option>
+                <option value="FRIENDS_ONLY">FRIENDS_ONLY</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              Latitude
+              <input id="lat" type="number" step="0.000001" value="-33.868820" />
+            </label>
+            <label>
+              Longitude
+              <input id="lon" type="number" step="0.000001" value="151.209296" />
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              API Base URL
+              <input id="apiBaseUrl" />
+            </label>
+            <label>
+              Auth Token
+              <input id="authToken" placeholder="Optional" />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="startBtn" class="primary">Start Rider</button>
+            <button id="stopBtn" class="ghost">Stop Rider</button>
+            <button id="moveNearbyBtn" class="ghost">Move Nearby</button>
+            <button id="moveFarBtn" class="ghost">Move Far Away</button>
+          </div>
+
+          <p class="hint">
+            Open this page in multiple tabs with different rider IDs if you want more than one
+            synthetic peer.
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>Runtime</h2>
+          <div class="stats">
+            <div class="stat">
+              <strong>Presence</strong>
+              <div id="presenceStatus" class="value warn">idle</div>
+            </div>
+            <div class="stat">
+              <strong>Channel</strong>
+              <div id="channelStatus" class="value">none</div>
+            </div>
+            <div class="stat">
+              <strong>WebSocket</strong>
+              <div id="wsStatus" class="value warn">closed</div>
+            </div>
+            <div class="stat">
+              <strong>Peers</strong>
+              <div id="peerCount" class="value">0</div>
+            </div>
+            <div class="stat">
+              <strong>Mic</strong>
+              <div id="micStatus" class="value warn">not requested</div>
+            </div>
+            <div class="stat">
+              <strong>Last Error</strong>
+              <div id="errorStatus" class="value">none</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Audio</h2>
+          <div class="audio-list">
+            <div>
+              <strong>Local preview</strong>
+              <audio id="localAudio" autoplay muted playsinline controls></audio>
+            </div>
+            <div id="remoteAudioList" class="audio-list"></div>
+          </div>
+          <p class="hint">
+            If the browser blocks autoplay, press play on the remote audio element after a peer
+            connects.
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>Event Log</h2>
+          <textarea id="log" readonly></textarea>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const els = {
+        riderId: document.getElementById('riderId'),
+        rideMode: document.getElementById('rideMode'),
+        lat: document.getElementById('lat'),
+        lon: document.getElementById('lon'),
+        apiBaseUrl: document.getElementById('apiBaseUrl'),
+        authToken: document.getElementById('authToken'),
+        startBtn: document.getElementById('startBtn'),
+        stopBtn: document.getElementById('stopBtn'),
+        moveNearbyBtn: document.getElementById('moveNearbyBtn'),
+        moveFarBtn: document.getElementById('moveFarBtn'),
+        presenceStatus: document.getElementById('presenceStatus'),
+        channelStatus: document.getElementById('channelStatus'),
+        wsStatus: document.getElementById('wsStatus'),
+        peerCount: document.getElementById('peerCount'),
+        micStatus: document.getElementById('micStatus'),
+        errorStatus: document.getElementById('errorStatus'),
+        log: document.getElementById('log'),
+        localAudio: document.getElementById('localAudio'),
+        remoteAudioList: document.getElementById('remoteAudioList'),
+      };
+
+      const state = {
+        running: false,
+        currentChannel: null,
+        ws: null,
+        localStream: null,
+        presenceInterval: null,
+        channelInterval: null,
+        peers: new Map(),
+      };
+
+      els.apiBaseUrl.value = window.location.origin;
+
+      function log(message, data) {
+        const line = `[${new Date().toLocaleTimeString()}] ${message}${data ? ` ${JSON.stringify(data)}` : ''}`;
+        els.log.value = `${line}\n${els.log.value}`.slice(0, 18000);
+      }
+
+      function setStatus(el, text, kind) {
+        el.textContent = text;
+        el.className = `value ${kind || ''}`.trim();
+      }
+
+      function authHeaders() {
+        const token = els.authToken.value.trim();
+        return token ? { Authorization: `Bearer ${token}` } : {};
+      }
+
+      function riderConfig() {
+        return {
+          riderId: els.riderId.value.trim(),
+          rideMode: els.rideMode.value,
+          lat: Number(els.lat.value),
+          lon: Number(els.lon.value),
+          apiBaseUrl: els.apiBaseUrl.value.trim().replace(/\/$/, ''),
+          token: els.authToken.value.trim(),
+        };
+      }
+
+      function wsBaseUrl(apiBaseUrl) {
+        return apiBaseUrl.replace(/^http/, 'ws');
+      }
+
+      function ensureRemoteAudio(peerId) {
+        const existing = document.getElementById(`audio-${peerId}`);
+        if (existing) {
+          return existing;
+        }
+        const wrapper = document.createElement('div');
+        wrapper.id = `wrapper-${peerId}`;
+        const label = document.createElement('strong');
+        label.textContent = `Remote: ${peerId}`;
+        const audio = document.createElement('audio');
+        audio.id = `audio-${peerId}`;
+        audio.autoplay = true;
+        audio.controls = true;
+        audio.playsInline = true;
+        wrapper.appendChild(label);
+        wrapper.appendChild(audio);
+        els.remoteAudioList.appendChild(wrapper);
+        return audio;
+      }
+
+      function removeRemoteAudio(peerId) {
+        const wrapper = document.getElementById(`wrapper-${peerId}`);
+        if (wrapper) wrapper.remove();
+      }
+
+      async function ensureLocalStream() {
+        if (state.localStream) return state.localStream;
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        state.localStream = stream;
+        els.localAudio.srcObject = stream;
+        setStatus(els.micStatus, 'ready', 'ok');
+        log('microphone ready');
+        return stream;
+      }
+
+      function closePeer(peerId) {
+        const peer = state.peers.get(peerId);
+        if (!peer) return;
+        peer.pc.close();
+        state.peers.delete(peerId);
+        removeRemoteAudio(peerId);
+        els.peerCount.textContent = String(state.peers.size);
+      }
+
+      function closeAllPeers() {
+        Array.from(state.peers.keys()).forEach(closePeer);
+      }
+
+      function stopLocalStream() {
+        if (!state.localStream) return;
+        state.localStream.getTracks().forEach((track) => track.stop());
+        state.localStream = null;
+        els.localAudio.srcObject = null;
+        setStatus(els.micStatus, 'not requested', 'warn');
+      }
+
+      async function ensurePeer(peerId, channelId) {
+        const existing = state.peers.get(peerId);
+        if (existing) return existing.pc;
+
+        const stream = await ensureLocalStream();
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        });
+
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+        pc.addEventListener('icecandidate', (event) => {
+          if (!event.candidate) return;
+          sendSignal({
+            type: 'ice',
+            channelId,
+            from: riderConfig().riderId,
+            to: peerId,
+            candidate: event.candidate.toJSON(),
+          });
+        });
+
+        pc.addEventListener('track', (event) => {
+          const audio = ensureRemoteAudio(peerId);
+          const [stream] = event.streams;
+          audio.srcObject = stream || new MediaStream([event.track]);
+          audio.play().catch((error) => {
+            log('remote audio autoplay blocked', { peerId, message: String(error) });
+          });
+          log('remote track', { peerId });
+        });
+
+        state.peers.set(peerId, { pc });
+        els.peerCount.textContent = String(state.peers.size);
+        return pc;
+      }
+
+      function sendSignal(payload) {
+        if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+        state.ws.send(JSON.stringify(payload));
+      }
+
+      async function maybeOfferPeer(peerId, channelId) {
+        const me = riderConfig().riderId;
+        if (me >= peerId) return;
+        const pc = await ensurePeer(peerId, channelId);
+        if (pc.signalingState !== 'stable' || pc.localDescription || pc.remoteDescription) {
+          return;
+        }
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendSignal({
+          type: 'offer',
+          channelId,
+          from: me,
+          to: peerId,
+          sdp: offer,
+        });
+        log('offer sent', { peerId });
+      }
+
+      async function handleOffer(from, sdp, channelId) {
+        const pc = await ensurePeer(from, channelId);
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendSignal({
+          type: 'answer',
+          channelId,
+          from: riderConfig().riderId,
+          to: from,
+          sdp: answer,
+        });
+        log('answer sent', { from });
+      }
+
+      async function handleAnswer(from, sdp) {
+        const peer = state.peers.get(from);
+        if (!peer) return;
+        await peer.pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        log('answer applied', { from });
+      }
+
+      async function handleIce(from, candidate) {
+        const peer = state.peers.get(from);
+        if (!peer) return;
+        await peer.pc.addIceCandidate(new RTCIceCandidate(candidate));
+      }
+
+      function disconnectSocket() {
+        if (state.ws) {
+          state.ws.close();
+          state.ws = null;
+        }
+        setStatus(els.wsStatus, 'closed', 'warn');
+      }
+
+      async function connectSocket(channelId) {
+        disconnectSocket();
+        const cfg = riderConfig();
+        const tokenParam = cfg.token ? `&token=${encodeURIComponent(cfg.token)}` : '';
+        const url = `${wsBaseUrl(cfg.apiBaseUrl)}/ws?channelId=${encodeURIComponent(channelId)}&riderId=${encodeURIComponent(cfg.riderId)}${tokenParam}`;
+
+        await new Promise((resolve, reject) => {
+          const ws = new WebSocket(url);
+          state.ws = ws;
+
+          ws.addEventListener('open', () => {
+            setStatus(els.wsStatus, 'open', 'ok');
+            log('ws open', { channelId });
+            resolve();
+          });
+
+          ws.addEventListener('error', () => {
+            setStatus(els.wsStatus, 'error', 'bad');
+            reject(new Error('WebSocket error'));
+          });
+
+          ws.addEventListener('close', () => {
+            setStatus(els.wsStatus, 'closed', 'warn');
+            log('ws closed');
+            closeAllPeers();
+          });
+
+          ws.addEventListener('message', async (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'joined' && Array.isArray(msg.members)) {
+              log('joined channel', { channelId, members: msg.members });
+              await ensureLocalStream();
+              for (const peerId of msg.members) {
+                await maybeOfferPeer(peerId, channelId);
+              }
+            } else if (msg.type === 'peer-joined' && msg.riderId) {
+              log('peer joined', { peerId: msg.riderId });
+              await ensureLocalStream();
+              await maybeOfferPeer(msg.riderId, channelId);
+            } else if (msg.type === 'offer' && msg.from && msg.sdp) {
+              log('offer received', { from: msg.from });
+              await handleOffer(msg.from, msg.sdp, channelId);
+            } else if (msg.type === 'answer' && msg.from && msg.sdp) {
+              await handleAnswer(msg.from, msg.sdp);
+            } else if (msg.type === 'ice' && msg.from && msg.candidate) {
+              await handleIce(msg.from, msg.candidate);
+            } else if (msg.type === 'left' && msg.riderId) {
+              log('peer left', { peerId: msg.riderId });
+              closePeer(msg.riderId);
+            }
+          });
+        });
+      }
+
+      async function sendPresence() {
+        const cfg = riderConfig();
+        const response = await fetch(`${cfg.apiBaseUrl}/presence`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+          },
+          body: JSON.stringify({
+            riderId: cfg.riderId,
+            lat: cfg.lat,
+            lon: cfg.lon,
+            rideMode: cfg.rideMode,
+            timestamp: Date.now(),
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(`presence failed: ${response.status}`);
+        }
+        setStatus(els.presenceStatus, 'ok', 'ok');
+      }
+
+      async function sendPresenceOff() {
+        const cfg = riderConfig();
+        await fetch(`${cfg.apiBaseUrl}/presence`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders(),
+          },
+          body: JSON.stringify({
+            riderId: cfg.riderId,
+            lat: cfg.lat,
+            lon: cfg.lon,
+            rideMode: 'OFF',
+            timestamp: Date.now(),
+          }),
+          keepalive: true,
+        });
+      }
+
+      async function pollChannel() {
+        const cfg = riderConfig();
+        const response = await fetch(
+          `${cfg.apiBaseUrl}/presence/channel?riderId=${encodeURIComponent(cfg.riderId)}`,
+          { headers: authHeaders() }
+        );
+        if (!response.ok) {
+          throw new Error(`channel poll failed: ${response.status}`);
+        }
+        const data = await response.json();
+        const nextChannel = data.channelId || null;
+        if (nextChannel === state.currentChannel) {
+          if (nextChannel && (!state.ws || state.ws.readyState !== WebSocket.OPEN)) {
+            await connectSocket(nextChannel);
+          }
+          return;
+        }
+
+        if (!nextChannel) {
+          log('left channel', { previous: state.currentChannel });
+          state.currentChannel = null;
+          setStatus(els.channelStatus, 'none', '');
+          disconnectSocket();
+          closeAllPeers();
+          return;
+        }
+
+        state.currentChannel = nextChannel;
+        setStatus(els.channelStatus, nextChannel, 'ok');
+        log('channel assigned', { channelId: nextChannel });
+        await connectSocket(nextChannel);
+      }
+
+      async function tick() {
+        if (!state.running) return;
+        try {
+          await sendPresence();
+          await pollChannel();
+          setStatus(els.errorStatus, 'none', '');
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setStatus(els.errorStatus, message, 'bad');
+          log('tick failed', { message });
+        }
+      }
+
+      async function startRider() {
+        if (state.running) return;
+        state.running = true;
+        setStatus(els.presenceStatus, 'starting', 'warn');
+        log('rider started', riderConfig());
+        await tick();
+        state.presenceInterval = window.setInterval(() => {
+          void sendPresence().catch((error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            setStatus(els.errorStatus, message, 'bad');
+          });
+        }, 5000);
+        state.channelInterval = window.setInterval(() => {
+          void pollChannel().catch((error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            setStatus(els.errorStatus, message, 'bad');
+          });
+        }, 2500);
+      }
+
+      async function stopRider() {
+        if (!state.running) return;
+        state.running = false;
+        window.clearInterval(state.presenceInterval);
+        window.clearInterval(state.channelInterval);
+        state.presenceInterval = null;
+        state.channelInterval = null;
+        state.currentChannel = null;
+        disconnectSocket();
+        closeAllPeers();
+        stopLocalStream();
+        setStatus(els.presenceStatus, 'stopped', 'warn');
+        setStatus(els.channelStatus, 'none', '');
+        log('rider stopped');
+      }
+
+      function setLocation(lat, lon) {
+        els.lat.value = lat.toFixed(6);
+        els.lon.value = lon.toFixed(6);
+        log('location changed', { lat: Number(els.lat.value), lon: Number(els.lon.value) });
+        if (state.running) {
+          void tick();
+        }
+      }
+
+      els.startBtn.addEventListener('click', () => {
+        void startRider();
+      });
+
+      els.stopBtn.addEventListener('click', () => {
+        void stopRider();
+      });
+
+      els.moveNearbyBtn.addEventListener('click', () => {
+        setLocation(-33.868820, 151.209296);
+      });
+
+      els.moveFarBtn.addEventListener('click', () => {
+        setLocation(-33.875900, 151.215800);
+      });
+
+      window.addEventListener('beforeunload', () => {
+        if (state.running) {
+          void sendPresenceOff();
+        }
+      });
+    </script>
+  </body>
+</html>

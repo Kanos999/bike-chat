@@ -12,12 +12,25 @@ type SignallingMessage =
   | { type: 'ice'; channelId: string; from: string; to: string; candidate: unknown };
 
 const channelMembers = new Map<string, Set<string>>();
+const riderSockets = new Map<string, Set<import('ws').WebSocket>>();
 
 const logWs = !['0', 'false', 'no', 'off'].includes(String(process.env.WS_LOGS ?? '').toLowerCase());
 
 function getMembers(channelId: string): string[] {
   const set = channelMembers.get(channelId);
   return set ? Array.from(set) : [];
+}
+
+function addSocketForRider(riderId: string, ws: import('ws').WebSocket): void {
+  if (!riderSockets.has(riderId)) riderSockets.set(riderId, new Set());
+  riderSockets.get(riderId)!.add(ws);
+}
+
+function removeSocketForRider(riderId: string, ws: import('ws').WebSocket): void {
+  const sockets = riderSockets.get(riderId);
+  if (!sockets) return;
+  sockets.delete(ws);
+  if (sockets.size === 0) riderSockets.delete(riderId);
 }
 
 export function startSignallingServer(server: import('http').Server, auth: AuthContextLike): void {
@@ -52,6 +65,7 @@ export function startSignallingServer(server: import('http').Server, auth: AuthC
       if (!channelMembers.has(channelId)) channelMembers.set(channelId, new Set());
       channelMembers.get(channelId)!.add(riderId);
       (ws as import('ws').WebSocket & { riderId?: string }).riderId = riderId;
+      addSocketForRider(riderId, ws);
 
       const members = getMembers(channelId).filter((id) => id !== riderId);
 
@@ -60,6 +74,9 @@ export function startSignallingServer(server: import('http').Server, auth: AuthC
       };
 
       send({ type: 'joined', channelId, members });
+      members.forEach((id) => {
+        broadcastTo(id, { type: 'peer-joined', channelId, riderId });
+      });
 
       ws.on('message', (raw) => {
         try {
@@ -74,6 +91,7 @@ export function startSignallingServer(server: import('http').Server, auth: AuthC
 
       ws.on('close', () => {
         if (logWs) console.log('[ws] close', { channelId, riderId });
+        removeSocketForRider(riderId, ws);
         const membersSet = channelMembers.get(channelId);
         membersSet?.delete(riderId);
         if (membersSet && membersSet.size === 0) {
@@ -87,10 +105,12 @@ export function startSignallingServer(server: import('http').Server, auth: AuthC
   });
 
   function broadcastTo(toRiderId: string, payload: object): void {
-    wss.clients.forEach((client) => {
-      if (client.readyState !== 1) return;
-      const r = (client as import('ws').WebSocket & { riderId?: string }).riderId;
-      if (r === toRiderId) client.send(JSON.stringify(payload));
+    const clients = riderSockets.get(toRiderId);
+    if (!clients || clients.size === 0) return;
+
+    const encoded = JSON.stringify(payload);
+    clients.forEach((client) => {
+      if (client.readyState === 1) client.send(encoded);
     });
   }
 }

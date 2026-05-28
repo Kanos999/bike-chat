@@ -3,11 +3,22 @@ import { services } from '../modules/services';
 import { IntercomState } from '../modules/voice/types';
 import { RideSessionHandles } from './types';
 
+function samePeerIds(a: string[], b: string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 export interface VoiceSlice {
   intercomState: IntercomState;
   localMuted: boolean;
   globalMuted: boolean;
+  connectedPeerIds: string[];
   attachVoiceListener: (handles: RideSessionHandles) => void;
+  attachVoicePeerListener: (handles: RideSessionHandles) => void;
   toggleLocalMute: () => Promise<void>;
   toggleGlobalMute: () => Promise<void>;
   setIntercomState: (state: IntercomState) => void;
@@ -22,21 +33,50 @@ export const createVoiceSlice: StateCreator<
   intercomState: 'DISABLED',
   localMuted: false,
   globalMuted: false,
+  connectedPeerIds: [],
   attachVoiceListener: (handles) => {
     if (handles.unsubscribeVoice) return;
     handles.unsubscribeVoice = services.voice.onStateChange((state) => {
-      set({
-        intercomState: state,
-        localMuted: state === 'MUTED_LOCAL',
-        globalMuted: state === 'MUTED_GLOBAL',
+      set((current) => {
+        const localMuted = state === 'MUTED_LOCAL';
+        const globalMuted = state === 'MUTED_GLOBAL';
+        if (
+          current.intercomState === state &&
+          current.localMuted === localMuted &&
+          current.globalMuted === globalMuted
+        ) {
+          return current;
+        }
+        return {
+          intercomState: state,
+          localMuted,
+          globalMuted,
+        };
       });
     });
   },
+  attachVoicePeerListener: (handles) => {
+    if (handles.unsubscribeVoicePeers || !services.voice.onPeersChange) return;
+    handles.unsubscribeVoicePeers = services.voice.onPeersChange((peerIds) => {
+      set((current) => (samePeerIds(current.connectedPeerIds, peerIds) ? current : { connectedPeerIds: peerIds }));
+    });
+  },
   setIntercomState: (state) =>
-    set({
-      intercomState: state,
-      localMuted: state === 'MUTED_LOCAL',
-      globalMuted: state === 'MUTED_GLOBAL',
+    set((current) => {
+      const localMuted = state === 'MUTED_LOCAL';
+      const globalMuted = state === 'MUTED_GLOBAL';
+      if (
+        current.intercomState === state &&
+        current.localMuted === localMuted &&
+        current.globalMuted === globalMuted
+      ) {
+        return current;
+      }
+      return {
+        intercomState: state,
+        localMuted,
+        globalMuted,
+      };
     }),
   toggleLocalMute: async () => {
     const next = !get().localMuted;

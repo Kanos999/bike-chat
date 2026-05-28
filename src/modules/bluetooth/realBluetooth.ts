@@ -1,5 +1,5 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
-import type { BluetoothModule, HeadsetEventType, RiderBeacon } from './types';
+import type { AudioRoute, BluetoothModule, HeadsetEventType, RiderBeacon } from './types';
 
 const { BleModule: NativeBle } = NativeModules;
 
@@ -10,6 +10,7 @@ function createRealBluetoothModule(): BluetoothModule | null {
   let beaconSub: { remove: () => void } | null = null;
   let headsetSub: { remove: () => void } | null = null;
   let helmetSub: { remove: () => void } | null = null;
+  let audioRouteSub: { remove: () => void } | null = null;
 
   const startAdvertising = async (riderId: string, flags: number): Promise<void> => {
     NativeBle.startAdvertising(riderId, flags);
@@ -66,6 +67,31 @@ function createRealBluetoothModule(): BluetoothModule | null {
     };
   };
 
+  const startVoiceRoute = async (): Promise<void> => {
+    NativeBle.startVoiceRoute();
+  };
+
+  const stopVoiceRoute = async (): Promise<void> => {
+    NativeBle.stopVoiceRoute();
+  };
+
+  const onAudioRouteChange = (listener: (route: AudioRoute) => void): (() => void) => {
+    audioRouteSub = emitter.addListener('BleAudioRoute', (payload: { route: AudioRoute }) => {
+      listener(payload.route);
+    });
+    if (typeof NativeBle.getCurrentAudioRoute === 'function') {
+      Promise.resolve(NativeBle.getCurrentAudioRoute())
+        .then((route: AudioRoute) => listener(route))
+        .catch(() => {});
+    } else {
+      listener('UNKNOWN');
+    }
+    return () => {
+      audioRouteSub?.remove();
+      audioRouteSub = null;
+    };
+  };
+
   const module: BluetoothModule = {
     startAdvertising,
     stopAdvertising,
@@ -73,6 +99,9 @@ function createRealBluetoothModule(): BluetoothModule | null {
     stopScanning,
     onHeadsetEvent,
     onHelmetConnectionChange,
+    startVoiceRoute,
+    stopVoiceRoute,
+    onAudioRouteChange,
   };
   return Object.assign(module, {
     simulateHeadsetEvent: (_event: HeadsetEventType) => {},

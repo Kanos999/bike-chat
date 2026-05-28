@@ -1,16 +1,21 @@
 package com.bikechattemp
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.bluetooth.le.BluetoothLeScanner
-import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.os.Build
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -26,14 +31,49 @@ class BleModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
   private val bluetoothManager: BluetoothManager? =
     reactContext.getSystemService(ReactApplicationContext.BLUETOOTH_SERVICE) as? BluetoothManager
+  private val audioManager: AudioManager? =
+    reactContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
   private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager?.adapter
   private val bleAdvertiser: BluetoothLeAdvertiser? = bluetoothAdapter?.bluetoothLeAdvertiser
   private val bleScanner: BluetoothLeScanner? = bluetoothAdapter?.bluetoothLeScanner
 
   private var advertising = false
   private var scanning = false
+  private var voiceRouteActive = false
+  private var audioDeviceCallbackRegistered = false
   private var currentRiderId: String = ""
   private var currentFlags: Int = 0
+  private val audioDeviceCallback = object : AudioDeviceCallback() {
+    override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+      updateAudioState()
+    }
+
+    override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+      updateAudioState()
+    }
+  }
+
+  private fun registerAudioDeviceCallbackIfNeeded() {
+    if (audioDeviceCallbackRegistered) return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      try {
+        audioManager?.registerAudioDeviceCallback(audioDeviceCallback, null)
+        audioDeviceCallbackRegistered = true
+      } catch (_: Exception) {
+      }
+    }
+  }
+
+  private fun unregisterAudioDeviceCallbackIfNeeded() {
+    if (!audioDeviceCallbackRegistered) return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      try {
+        audioManager?.unregisterAudioDeviceCallback(audioDeviceCallback)
+      } catch (_: Exception) {
+      }
+    }
+    audioDeviceCallbackRegistered = false
+  }
 
   private fun emitBeacon(riderId: String, rssi: Int, flags: Int) {
     val params: WritableMap = Arguments.createMap()
@@ -59,6 +99,69 @@ class BleModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     reactApplicationContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
       .emit(EVENT_HELMET, params)
+  }
+
+  private fun emitAudioRoute(route: String) {
+    val params: WritableMap = Arguments.createMap()
+    params.putString("route", route)
+    reactApplicationContext
+      .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+      .emit(EVENT_AUDIO_ROUTE, params)
+  }
+
+  private fun hasAudioDevice(types: Set<Int>): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
+    val devices = audioManager?.getDevices(AudioManager.GET_DEVICES_ALL) ?: return false
+    return devices.any { device -> types.contains(device.type) }
+  }
+
+  private fun isBluetoothVoiceAvailable(): Boolean {
+    val bluetoothTypes = mutableSetOf(
+      AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+      AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+    )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      bluetoothTypes.add(AudioDeviceInfo.TYPE_BLE_HEADSET)
+      bluetoothTypes.add(AudioDeviceInfo.TYPE_BLE_SPEAKER)
+    }
+    return hasAudioDevice(bluetoothTypes)
+  }
+
+  private fun isWiredAudioAvailable(): Boolean {
+    return hasAudioDevice(setOf(AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET))
+  }
+
+  private fun currentAudioRoute(): String {
+    val manager = audioManager ?: return "UNKNOWN"
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      val device = manager.communicationDevice
+      if (device != null) {
+        return when (device.type) {
+          AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+          AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "BT_INTERCOM"
+          AudioDeviceInfo.TYPE_WIRED_HEADSET,
+          AudioDeviceInfo.TYPE_USB_HEADSET -> "WIRED_HEADSET"
+          AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "EARPIECE"
+          AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "SPEAKER"
+          AudioDeviceInfo.TYPE_BLE_HEADSET,
+          AudioDeviceInfo.TYPE_BLE_SPEAKER -> "BT_INTERCOM"
+          else -> "UNKNOWN"
+        }
+      }
+    }
+
+    return when {
+      manager.isBluetoothScoOn || isBluetoothVoiceAvailable() -> "BT_INTERCOM"
+      manager.isSpeakerphoneOn -> "SPEAKER"
+      isWiredAudioAvailable() -> "WIRED_HEADSET"
+      else -> "EARPIECE"
+    }
+  }
+
+  private fun updateAudioState() {
+    val bluetoothConnected = isBluetoothVoiceAvailable()
+    emitHelmetConnection(bluetoothConnected)
+    emitAudioRoute(currentAudioRoute())
   }
 
   @ReactMethod
@@ -123,6 +226,63 @@ class BleModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun removeListeners(_count: Int) {}
 
+  @ReactMethod
+  fun startVoiceRoute() {
+    val manager = audioManager ?: return
+    voiceRouteActive = true
+    registerAudioDeviceCallbackIfNeeded()
+    manager.mode = AudioManager.MODE_IN_COMMUNICATION
+    manager.isSpeakerphoneOn = false
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      val target = manager.availableCommunicationDevices.firstOrNull { device ->
+        when (device.type) {
+          AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+          AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+          AudioDeviceInfo.TYPE_BLE_HEADSET,
+          AudioDeviceInfo.TYPE_BLE_SPEAKER,
+          AudioDeviceInfo.TYPE_WIRED_HEADSET,
+          AudioDeviceInfo.TYPE_USB_HEADSET,
+          AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> true
+          else -> false
+        }
+      }
+      if (target != null) {
+        manager.setCommunicationDevice(target)
+      }
+    } else if (isBluetoothVoiceAvailable()) {
+      try {
+        manager.startBluetoothSco()
+        manager.isBluetoothScoOn = true
+      } catch (_: Exception) {
+      }
+    }
+
+    updateAudioState()
+  }
+
+  @ReactMethod
+  fun stopVoiceRoute() {
+    val manager = audioManager ?: return
+    voiceRouteActive = false
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      manager.clearCommunicationDevice()
+    }
+    try {
+      manager.stopBluetoothSco()
+    } catch (_: Exception) {
+    }
+    manager.isBluetoothScoOn = false
+    manager.mode = AudioManager.MODE_NORMAL
+    unregisterAudioDeviceCallbackIfNeeded()
+    updateAudioState()
+  }
+
+  @ReactMethod
+  fun getCurrentAudioRoute(promise: Promise) {
+    promise.resolve(currentAudioRoute())
+  }
+
   private val advertiseCallback = object : android.bluetooth.le.AdvertiseCallback() {
     override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {}
     override fun onStartFailure(errorCode: Int) {}
@@ -132,8 +292,7 @@ class BleModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     override fun onScanResult(callbackType: Int, result: ScanResult?) {
       if (result == null) return
       val record = result.scanRecord ?: return
-      val mfgData = record.getManufacturerSpecificData() ?: return
-      val mfg = mfgData.get(BIKE_CHAT_MANUFACTURER_ID) ?: return
+      val mfg = record.getManufacturerSpecificData(BIKE_CHAT_MANUFACTURER_ID) ?: return
       if (mfg.size < 1) return
       val flags = mfg[0].toInt() and 0xFF
       val riderId = if (mfg.size > 1) String(mfg.copyOfRange(1, mfg.size), Charsets.UTF_8).trim('\u0000') else "unknown"
@@ -147,5 +306,6 @@ class BleModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     const val EVENT_BEACON = "BleBeacon"
     const val EVENT_HEADSET = "BleHeadsetEvent"
     const val EVENT_HELMET = "BleHelmetConnection"
+    const val EVENT_AUDIO_ROUTE = "BleAudioRoute"
   }
 }

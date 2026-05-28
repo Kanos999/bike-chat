@@ -54,39 +54,61 @@ export const createRealLocationModule = (): LocationModule => {
       onLocation(loc);
     };
 
-    // Get an initial fix ASAP (cached or quick). Physical devices often delay watchPosition
-    // or never fire indoors; without this, lastLocation stays null and no presence is sent.
-    Geolocation.getCurrentPosition(
-      reportPosition,
-      (err) => {
-        console.warn('[geolocation] getCurrentPosition', err);
-        // If we didn't get a fast/cached fix, retry once with high accuracy and a longer timeout.
-        // This helps on emulators and on devices that need to warm up GPS.
-        if (err?.code === 2 || err?.code === 3) {
-          Geolocation.getCurrentPosition(
-            reportPosition,
-            (err2) => console.warn('[geolocation] getCurrentPosition(highAccuracy)', err2),
-            {
-              enableHighAccuracy: true,
-              timeout: 60000,
-              maximumAge: 0,
-              ...androidExtraOptions,
-            } as any
-          );
-        }
+    const requestCurrentPosition = (
+      label: string,
+      options: {
+        enableHighAccuracy: boolean;
+        timeout: number;
+        maximumAge: number;
       },
+      onError?: (err: { code: number; message: string }) => void
+    ) => {
+      Geolocation.getCurrentPosition(
+        reportPosition,
+        (err) => {
+          console.warn(`[geolocation] ${label}`, err);
+          onError?.(err);
+        },
+        {
+          ...options,
+          ...androidExtraOptions,
+        } as any
+      );
+    };
+
+    // Try to get any usable fix quickly first. On physical Android devices this often succeeds
+    // from cached/network location even when GPS has not locked yet.
+    requestCurrentPosition(
+      'getCurrentPosition(fast)',
       {
-        enableHighAccuracy: Platform.OS === 'android',
-        timeout: 30000,
-        maximumAge: 60000,
-        ...androidExtraOptions,
-      } as any
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 5 * 60 * 1000,
+      },
+      (err) => {
+        // If the quick path times out or no provider is ready, escalate to GPS and wait longer.
+        if (err.code === 2 || err.code === 3) {
+          requestCurrentPosition('getCurrentPosition(highAccuracy)', {
+            enableHighAccuracy: true,
+            timeout: 60000,
+            maximumAge: 0,
+          });
+        }
+      }
     );
 
     watchId = Geolocation.watchPosition(
       reportPosition,
       (err) => console.warn('[geolocation] watchPosition', err),
-      ({ enableHighAccuracy: true, distanceFilter: 10, ...androidExtraOptions } as any)
+      ({
+        enableHighAccuracy: true,
+        distanceFilter: 10,
+        interval: 5000,
+        fastestInterval: 2000,
+        timeout: 20000,
+        maximumAge: 15000,
+        ...androidExtraOptions,
+      } as any)
     );
   };
 

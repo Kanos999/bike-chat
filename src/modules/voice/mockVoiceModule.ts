@@ -6,12 +6,15 @@ export const createMockVoiceModule = (): VoiceModule => {
   let state: IntercomState = 'DISABLED';
   let currentChannel: string | null = null;
   const listeners: Listener[] = [];
+  const peerListeners: Array<(peerIds: string[]) => void> = [];
 
   const notify = () => listeners.forEach((listener) => listener(state));
+  const notifyPeers = (peerIds: string[]) => peerListeners.forEach((listener) => listener(peerIds));
 
   const init = async () => {
     state = 'IDLE';
     notify();
+    notifyPeers([]);
   };
 
   const joinChannel = async (channelId: string) => {
@@ -20,12 +23,14 @@ export const createMockVoiceModule = (): VoiceModule => {
       state = 'OPEN';
     }
     notify();
+    notifyPeers(['demo-rider-7']);
   };
 
   const leaveChannel = async () => {
     currentChannel = null;
     state = 'IDLE';
     notify();
+    notifyPeers([]);
   };
 
   const setLocalMute = async (muted: boolean) => {
@@ -61,6 +66,15 @@ export const createMockVoiceModule = (): VoiceModule => {
     };
   };
 
+  const onPeersChange = (listener: (peerIds: string[]) => void) => {
+    peerListeners.push(listener);
+    listener(currentChannel ? ['demo-rider-7'] : []);
+    return () => {
+      const index = peerListeners.indexOf(listener);
+      if (index >= 0) peerListeners.splice(index, 1);
+    };
+  };
+
   const subscribeToInputLevel = (_callback: (level: number) => void) => {
     return () => {};
   };
@@ -73,6 +87,7 @@ export const createMockVoiceModule = (): VoiceModule => {
     setGlobalMute,
     getState,
     onStateChange,
+    onPeersChange,
     subscribeToInputLevel,
   };
 };

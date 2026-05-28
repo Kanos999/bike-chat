@@ -1,5 +1,5 @@
 import { config } from '../../config';
-import type { ApiClient, NearbyChannelResponse, PresenceUpdate } from './types';
+import type { ApiClient, ChannelMemberSummary, NearbyChannelResponse, PresenceUpdate } from './types';
 
 export function createRealApiClient(): ApiClient {
   const authHeaders = (): Record<string, string> =>
@@ -41,8 +41,8 @@ export function createRealApiClient(): ApiClient {
     }
     log('GET', url, '->', res.status);
     if (!res.ok) throw new Error(`Get channel failed: ${res.status}`);
-    const data = (await res.json()) as { channelId: string | null };
-    return { channelId: data.channelId };
+    const data = (await res.json()) as { channelId: string | null; members?: ChannelMemberSummary[] };
+    return { channelId: data.channelId, members: Array.isArray(data.members) ? data.members : [] };
   };
 
   return {

@@ -13,16 +13,20 @@ Node.js/TypeScript service that provides **presence**, **channel assignment**, a
 
   - **Body:** `{ riderId: string, lat: number, lon: number, rideMode?: 'OFF'|'OPEN'|'FRIENDS_ONLY', timestamp?: number }`
   - **Response:** `204 No Content` on success; `400` if `riderId`, `lat`, or `lon` are missing or invalid.
-  - **Behaviour:** The server stores this as the rider’s latest presence. Each presence has a **TTL of 90 seconds**; if the client doesn’t send another update, the entry is removed. Presence is tagged with a **geohash** (precision 5, ~5 km cells) for grouping.
+  - **Behaviour:** The server stores this as the rider’s latest presence. Each presence has a **TTL of 90 seconds**; if the client doesn’t send another update, the entry is removed. Presence is tagged with a **geohash** (precision 6, ~0.6-1.2 km cells) and indexed spatially so nearby riders can be found cheaply.
 
 - **`GET /presence/channel?riderId=<id>`**  
   Returns the channel the rider should join, if any.
 
   - **Response:** `{ channelId: string | null }`
-  - **Behaviour:** A rider gets a non-null `channelId` when at least two compatible riders are connected through proximity links of **<=150 m**.
-    - **OPEN:** can match any nearby rider in OPEN/FRIENDS_ONLY compatibility rules.
-    - **FRIENDS_ONLY:** only matches nearby riders in FRIENDS_ONLY mode.
-  - Channel id format: `channel-<geohash>` where the geohash is derived from the connected group centroid (stable, but not restricted to one geohash cell).
+  - **Behaviour:** A rider gets a non-null `channelId` when at least two compatible riders are connected through proximity links, evaluated with **hysteresis**:
+    - **Join radius: 150 m.** A new link forms when two compatible riders come within 150 m.
+    - **Leave radius: 300 m.** An existing link is *retained* until the riders drift beyond 300 m. This keeps a paired group connected through normal spacing/traffic instead of flapping at the boundary.
+  - **Mode compatibility is symmetric** — a link only forms between riders in the *same* mode:
+    - **OPEN** pairs with OPEN.
+    - **FRIENDS_ONLY** pairs only with FRIENDS_ONLY (a private crew is never pulled into an open rider's channel).
+  - **Sticky channel id.** A group's `channelId` is assigned when the group first forms and persists for the group's lifetime — it does **not** change as the group moves, and on a merge the older group's id wins. So a crew riding together stays on one channel for the whole ride (no mid-ride rejoins). Minted ids look like `channel-<geohash>-<seq>`.
+  - Membership is computed statefully and cached briefly (recomputed at most every ~500 ms), so a dense cluster is solved once per tick rather than once per rider-poll.
 
 So: clients **push** presence with `POST /presence`, and **poll** `GET /presence/channel` to know when to join/leave a channel. No authentication in this MVP.
 
@@ -30,7 +34,7 @@ So: clients **push** presence with `POST /presence`, and **poll** `GET /presence
 
 - Implemented in `src/presenceStore.ts`.
 - **Storage:** In-memory `Map` keyed by `riderId`. Each value is the latest presence plus an expiry time (now + 90 s).
-- **Geohash:** Uses the `ngeohash` library with precision 5 so riders within roughly the same ~5 km cell can be assigned the same channel.
+- **Geohash:** Uses the `ngeohash` library with precision 6; the 3x3 cell neighbourhood around a rider covers the 300 m leave radius, so candidate peers are found via the index rather than scanning everyone.
 - **Cleanup:** A timer runs every 30 seconds and deletes expired entries. Expired entries are also removed on read when iterating the store.
 
 **Limitations:** Data is lost on restart and doesn’t scale across multiple server instances. For production you’d typically back this with Redis (or similar) and optional horizontal scaling.
@@ -87,6 +91,26 @@ npm install
   Example: `PORT=3001 npm run dev`
 
 The server logs: `API + WebSocket listening on http://localhost:${PORT}`.
+
+### Browser rider harness
+
+For one-phone testing, the backend also serves a browser-based rider harness:
+
+- `GET /dev/harness.html`
+
+Open it from your laptop browser using the same host that the phone uses for the backend, for example:
+
+```text
+http://192.168.0.79:3001/dev/harness.html
+```
+
+The harness can:
+
+- send presence updates with manual coordinates
+- poll for assigned channels
+- join `/ws`
+- exchange WebRTC audio with the Android app
+- simulate extra riders by opening multiple tabs with different rider IDs
 
 ---
 
@@ -192,7 +216,7 @@ Set the app’s base URL (e.g. in `src/config.ts` or via env) to your deployed h
 | Component        | Role                                                                 |
 |-----------------|----------------------------------------------------------------------|
 | **POST /presence** | Update rider location and mode; stored in memory with 90 s TTL.     |
-| **GET /presence/channel** | Return shared channel id when ≥2 compatible riders are connected within 150 m links. |
+| **GET /presence/channel** | Return shared channel id for ≥2 same-mode riders linked with hysteresis (150 m join / 300 m leave); ids are sticky for the group's lifetime. |
 | **Presence store** | In-memory map + geohash; pruned every 30 s.                         |
   | **WebSocket /ws**  | Join channel by `channelId`/`riderId`; relay offer/answer/ice.       |
   | **Single process** | One port (default 3001) for HTTP and WS.                            |

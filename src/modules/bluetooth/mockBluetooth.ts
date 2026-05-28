@@ -1,4 +1,4 @@
-import { BluetoothModule, HeadsetEventType, RiderBeacon } from './types';
+import { AudioRoute, BluetoothModule, HeadsetEventType, RiderBeacon } from './types';
 
 const randomBeacon = (): RiderBeacon => ({
   riderId: `rider-${Math.floor(Math.random() * 1000)}`,
@@ -11,6 +11,7 @@ type Listener<T> = (value: T) => void;
 export interface MockBluetoothModule extends BluetoothModule {
   simulateHeadsetEvent: (event: HeadsetEventType) => void;
   simulateHelmetConnection: (connected: boolean) => void;
+  simulateAudioRoute: (route: AudioRoute) => void;
 }
 
 export const createMockBluetoothModule = (): MockBluetoothModule => {
@@ -18,8 +19,10 @@ export const createMockBluetoothModule = (): MockBluetoothModule => {
   let scanning = false;
   let scanInterval: NodeJS.Timeout | null = null;
   let connected = true;
+  let audioRoute: AudioRoute = 'BT_INTERCOM';
   const headsetListeners: Listener<HeadsetEventType>[] = [];
   const helmetListeners: Listener<boolean>[] = [];
+  const audioRouteListeners: Listener<AudioRoute>[] = [];
 
   const startAdvertising = async (riderId: string, flags: number) => {
     advertising = true;
@@ -65,6 +68,25 @@ export const createMockBluetoothModule = (): MockBluetoothModule => {
     };
   };
 
+  const startVoiceRoute = async () => {
+    audioRoute = connected ? 'BT_INTERCOM' : 'SPEAKER';
+    audioRouteListeners.forEach((listener) => listener(audioRoute));
+  };
+
+  const stopVoiceRoute = async () => {
+    audioRoute = connected ? 'BT_INTERCOM' : 'EARPIECE';
+    audioRouteListeners.forEach((listener) => listener(audioRoute));
+  };
+
+  const onAudioRouteChange = (listener: (route: AudioRoute) => void) => {
+    audioRouteListeners.push(listener);
+    listener(audioRoute);
+    return () => {
+      const index = audioRouteListeners.indexOf(listener);
+      if (index >= 0) audioRouteListeners.splice(index, 1);
+    };
+  };
+
   const simulateHeadsetEvent = (event: HeadsetEventType) => {
     headsetListeners.forEach((listener) => listener(event));
   };
@@ -72,6 +94,13 @@ export const createMockBluetoothModule = (): MockBluetoothModule => {
   const simulateHelmetConnection = (state: boolean) => {
     connected = state;
     helmetListeners.forEach((listener) => listener(state));
+    audioRoute = state ? 'BT_INTERCOM' : 'SPEAKER';
+    audioRouteListeners.forEach((listener) => listener(audioRoute));
+  };
+
+  const simulateAudioRoute = (route: AudioRoute) => {
+    audioRoute = route;
+    audioRouteListeners.forEach((listener) => listener(route));
   };
 
   return {
@@ -81,7 +110,11 @@ export const createMockBluetoothModule = (): MockBluetoothModule => {
     stopScanning,
     onHeadsetEvent,
     onHelmetConnectionChange,
+    startVoiceRoute,
+    stopVoiceRoute,
+    onAudioRouteChange,
     simulateHeadsetEvent,
     simulateHelmetConnection,
+    simulateAudioRoute,
   };
 };

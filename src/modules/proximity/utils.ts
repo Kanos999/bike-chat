@@ -6,8 +6,16 @@ export const upsertBeacon = (
 ): RiderBeacon[] => {
   const existingIndex = list.findIndex((b) => b.riderId === next.riderId);
   if (existingIndex >= 0) {
+    const existing = list[existingIndex];
+    if (
+      existing.riderId === next.riderId &&
+      existing.rssi === next.rssi &&
+      existing.flags === next.flags
+    ) {
+      return list;
+    }
     const copy = [...list];
-    copy[existingIndex] = { ...copy[existingIndex], ...next };
+    copy[existingIndex] = { ...existing, ...next };
     return copy;
   }
   return [...list, next];

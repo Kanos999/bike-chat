@@ -4,6 +4,7 @@ import {
   RTCIceCandidate,
   RTCPeerConnection,
   RTCSessionDescription,
+  MediaStream,
 } from 'react-native-webrtc';
 import type { IntercomState, VoiceModule } from './types';
 import { config } from '../../config';
@@ -28,6 +29,7 @@ async function requestAudioPermission(): Promise<boolean> {
 }
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+const MAX_MESH_PARTICIPANTS = 4;
 
 type Listener = (state: IntercomState) => void;
 
@@ -38,11 +40,18 @@ export function createWebRTCVoiceModule(): VoiceModule {
   let localMuted = false;
   let globalMuted = false;
   let localStream: import('react-native-webrtc').MediaStream | null = null;
+  const channelRoster = new Set<string>();
+  const remoteStreams = new Map<string, MediaStream>();
   const peerConnections = new Map<string, RTCPeerConnection>();
   const pendingIceCandidates = new Map<string, object[]>();
   const listeners: Listener[] = [];
+  const peerListeners: Array<(peerIds: string[]) => void> = [];
 
   const notify = () => listeners.forEach((l) => l(state));
+  const notifyPeers = () => {
+    const peerIds = Array.from(peerConnections.keys()).sort();
+    peerListeners.forEach((listener) => listener(peerIds));
+  };
 
   const setState = (s: IntercomState) => {
     state = s;
@@ -57,6 +66,16 @@ export function createWebRTCVoiceModule(): VoiceModule {
     if (ws?.readyState === 1) ws.send(JSON.stringify(msg));
   }
 
+  function getAllowedParticipants(): string[] {
+    return Array.from(channelRoster).sort().slice(0, MAX_MESH_PARTICIPANTS);
+  }
+
+  function canConnectTo(peerId: string): boolean {
+    const allowed = new Set(getAllowedParticipants());
+    const riderId = myRiderId();
+    return allowed.has(riderId) && allowed.has(peerId);
+  }
+
   async function getLocalAudioStream(): Promise<import('react-native-webrtc').MediaStream> {
     if (localStream) return localStream;
     const stream = await mediaDevices.getUserMedia({ audio: true, video: false });
@@ -69,7 +88,20 @@ export function createWebRTCVoiceModule(): VoiceModule {
       pc.close();
     });
     peerConnections.clear();
+    remoteStreams.clear();
     pendingIceCandidates.clear();
+    notifyPeers();
+  }
+
+  function dropPeer(peerId: string) {
+    const pc = peerConnections.get(peerId);
+    if (pc) {
+      pc.close();
+      peerConnections.delete(peerId);
+    }
+    remoteStreams.delete(peerId);
+    pendingIceCandidates.delete(peerId);
+    notifyPeers();
   }
 
   function stopLocalStream() {
@@ -86,8 +118,99 @@ export function createWebRTCVoiceModule(): VoiceModule {
     });
   }
 
-  async function handleJoined(members: string[], channelId: string) {
+  async function ensurePeerConnection(peerId: string, channelId: string): Promise<RTCPeerConnection> {
+    const existing = peerConnections.get(peerId);
+    if (existing) return existing;
+
+    const stream = await getLocalAudioStream();
+    applyLocalMute();
+
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+    pc.addEventListener('icecandidate', (e) => {
+      const ev = e as { candidate: RTCIceCandidate | null };
+      if (ev.candidate) {
+        sendSignalling({
+          type: 'ice',
+          channelId,
+          from: myRiderId(),
+          to: peerId,
+          candidate: ev.candidate.toJSON(),
+        });
+      }
+    });
+
+    pc.addEventListener('track', () => {
+      // Keep remote streams referenced so native audio tracks are not dropped.
+    });
+    pc.addEventListener('track', (e) => {
+      const event = e as { streams?: MediaStream[]; track?: { kind?: string } };
+      const stream = event.streams?.[0];
+      if (stream) {
+        remoteStreams.set(peerId, stream);
+      } else if (event.track?.kind === 'audio') {
+        const fallbackStream = new MediaStream();
+        fallbackStream.addTrack(event.track as any);
+        remoteStreams.set(peerId, fallbackStream);
+      }
+    });
+    pc.addEventListener('connectionstatechange', () => {
+      console.log('[webrtc] connectionState', peerId, pc.connectionState);
+    });
+    pc.addEventListener('iceconnectionstatechange', () => {
+      console.log('[webrtc] iceConnectionState', peerId, pc.iceConnectionState);
+    });
+
+    peerConnections.set(peerId, pc);
+    notifyPeers();
+    return pc;
+  }
+
+  async function maybeOfferPeer(peerId: string, channelId: string): Promise<void> {
+    if (!canConnectTo(peerId)) return;
     const riderId = myRiderId();
+    if (riderId >= peerId) return;
+
+    const pc = await ensurePeerConnection(peerId, channelId);
+    if (pc.signalingState !== 'stable' || pc.localDescription || pc.remoteDescription) {
+      return;
+    }
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    sendSignalling({
+      type: 'offer',
+      channelId,
+      from: riderId,
+      to: peerId,
+      sdp: offer,
+    });
+  }
+
+  async function reconcileAllowedPeers(channelId: string): Promise<void> {
+    const riderId = myRiderId();
+    const allowed = new Set(getAllowedParticipants());
+
+    for (const peerId of Array.from(peerConnections.keys())) {
+      if (!allowed.has(riderId) || !allowed.has(peerId)) {
+        dropPeer(peerId);
+      }
+    }
+
+    if (!allowed.has(riderId)) return;
+
+    for (const peerId of allowed) {
+      if (peerId === riderId) continue;
+      try {
+        await maybeOfferPeer(peerId, channelId);
+      } catch (err) {
+        console.warn('[webrtc] reconcileAllowedPeers', peerId, err);
+      }
+    }
+  }
+
+  async function handleJoined(members: string[], channelId: string) {
     const allowed = await requestAudioPermission();
     if (!allowed) {
       console.warn('[webrtc] Microphone permission denied');
@@ -95,53 +218,29 @@ export function createWebRTCVoiceModule(): VoiceModule {
       return;
     }
     try {
-      const stream = await getLocalAudioStream();
+      await getLocalAudioStream();
       applyLocalMute();
-
-      const peers = members.filter((id) => id !== riderId);
-      for (const peerId of peers) {
-        try {
-          const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-
-          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-          pc.addEventListener('icecandidate', (e) => {
-            const ev = e as { candidate: RTCIceCandidate | null };
-            if (ev.candidate) {
-              sendSignalling({
-                type: 'ice',
-                channelId,
-                from: riderId,
-                to: peerId,
-                candidate: ev.candidate.toJSON(),
-              });
-            }
-          });
-
-          pc.addEventListener('track', () => {
-            // Remote audio is played automatically by react-native-webrtc
-          });
-
-          peerConnections.set(peerId, pc);
-
-          if (riderId < peerId) {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            sendSignalling({
-              type: 'offer',
-              channelId,
-              from: riderId,
-              to: peerId,
-              sdp: offer,
-            });
-          }
-        } catch (peerErr) {
-          console.warn('[webrtc] peer setup failed for', peerId, peerErr);
-        }
-      }
+      channelRoster.clear();
+      channelRoster.add(myRiderId());
+      members.forEach((id) => channelRoster.add(id));
+      await reconcileAllowedPeers(channelId);
     } catch (err) {
       console.warn('[webrtc] getUserMedia or createOffer failed', err);
       setState('IDLE');
+    }
+  }
+
+  async function handlePeerJoined(peerId: string, channelId: string) {
+    const allowed = await requestAudioPermission();
+    if (!allowed) return;
+
+    try {
+      channelRoster.add(peerId);
+      await getLocalAudioStream();
+      applyLocalMute();
+      await reconcileAllowedPeers(channelId);
+    } catch (err) {
+      console.warn('[webrtc] handlePeerJoined', err);
     }
   }
 
@@ -150,37 +249,50 @@ export function createWebRTCVoiceModule(): VoiceModule {
     sdp: RTCSessionDescription | object,
     channelId: string
   ) {
+    channelRoster.add(from);
     let pc = peerConnections.get(from);
     if (!pc) {
       try {
-        const stream = await getLocalAudioStream();
-        applyLocalMute();
-        pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-        stream.getTracks().forEach((track) => pc!.addTrack(track, stream));
-        pc.addEventListener('icecandidate', (e) => {
-          const ev = e as { candidate: RTCIceCandidate | null };
-          if (ev.candidate) {
-            sendSignalling({
-              type: 'ice',
-              channelId,
-              from: myRiderId(),
-              to: from,
-              candidate: ev.candidate.toJSON(),
-            });
-          }
-        });
-        pc.addEventListener('track', () => {});
-        peerConnections.set(from, pc);
+        pc = await ensurePeerConnection(from, channelId);
       } catch (err) {
         console.warn('[webrtc] getUserMedia failed for answer', err);
         return;
       }
     }
 
+    if (!canConnectTo(from)) {
+      dropPeer(from);
+      return;
+    }
+
     const desc = sdp && typeof (sdp as RTCSessionDescription).type === 'string'
       ? (sdp as RTCSessionDescription)
       : new RTCSessionDescription(sdp as { type: string; sdp: string });
-    await pc.setRemoteDescription(desc);
+    if (desc.type !== 'offer') {
+      console.warn('[webrtc] handleOffer received non-offer SDP', { from, type: desc.type });
+      return;
+    }
+
+    // Ignore duplicate/stale offers once this peer has already negotiated to stable.
+    if (
+      pc.signalingState === 'stable' &&
+      pc.remoteDescription?.type === 'offer' &&
+      pc.remoteDescription?.sdp === desc.sdp
+    ) {
+      console.warn('[webrtc] ignoring duplicate remote offer', { from });
+      return;
+    }
+
+    try {
+      await pc.setRemoteDescription(desc);
+    } catch (err) {
+      console.warn('[webrtc] setRemoteDescription(offer) failed', {
+        from,
+        state: pc.signalingState,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
 
     const pending = pendingIceCandidates.get(from);
     if (pending?.length) {
@@ -190,6 +302,14 @@ export function createWebRTCVoiceModule(): VoiceModule {
         } catch (_) {}
       }
       pendingIceCandidates.delete(from);
+    }
+
+    if (pc.signalingState !== 'have-remote-offer' && pc.signalingState !== 'have-local-pranswer') {
+      console.warn('[webrtc] skipping answer in unexpected signaling state', {
+        from,
+        state: pc.signalingState,
+      });
+      return;
     }
 
     const answer = await pc.createAnswer();
@@ -207,6 +327,11 @@ export function createWebRTCVoiceModule(): VoiceModule {
     from: string,
     sdp: RTCSessionDescription | object
   ) {
+    channelRoster.add(from);
+    if (!canConnectTo(from)) {
+      dropPeer(from);
+      return;
+    }
     const pc = peerConnections.get(from);
     if (!pc) return;
     const desc = sdp && typeof (sdp as RTCSessionDescription).type === 'string'
@@ -226,6 +351,8 @@ export function createWebRTCVoiceModule(): VoiceModule {
   }
 
   async function handleIce(from: string, candidate: object) {
+    channelRoster.add(from);
+    if (!canConnectTo(from)) return;
     const pc = peerConnections.get(from);
     const ice = new RTCIceCandidate(candidate as RTCIceCandidate);
     if (!pc || !pc.remoteDescription) {
@@ -240,12 +367,13 @@ export function createWebRTCVoiceModule(): VoiceModule {
   }
 
   function handleLeft(riderId: string) {
-    const pc = peerConnections.get(riderId);
-    if (pc) {
-      pc.close();
-      peerConnections.delete(riderId);
+    channelRoster.delete(riderId);
+    dropPeer(riderId);
+    if (currentChannel) {
+      void reconcileAllowedPeers(currentChannel).catch((err) =>
+        console.warn('[webrtc] reconcile after left', err)
+      );
     }
-    pendingIceCandidates.delete(riderId);
   }
 
   const closeWs = () => {
@@ -254,6 +382,7 @@ export function createWebRTCVoiceModule(): VoiceModule {
       ws = null;
     }
     currentChannel = null;
+    channelRoster.clear();
     closeAllPeers();
     stopLocalStream();
   };
@@ -265,6 +394,7 @@ export function createWebRTCVoiceModule(): VoiceModule {
   const joinChannel = async (channelId: string): Promise<void> => {
     closeWs();
     const riderId = myRiderId();
+    channelRoster.add(riderId);
     const tokenParam = config.authToken ? `&token=${encodeURIComponent(config.authToken)}` : '';
     const url = `${config.wsBaseUrl}?channelId=${encodeURIComponent(channelId)}&riderId=${encodeURIComponent(riderId)}${tokenParam}`;
 
@@ -297,6 +427,10 @@ export function createWebRTCVoiceModule(): VoiceModule {
             if (msg.type === 'joined' && Array.isArray(msg.members)) {
               void handleJoined(msg.members, channelId).catch((e) =>
                 console.warn('[webrtc] handleJoined', e)
+              );
+            } else if (msg.type === 'peer-joined' && msg.riderId) {
+              void handlePeerJoined(msg.riderId, channelId).catch((e) =>
+                console.warn('[webrtc] handlePeerJoined', e)
               );
             } else if (msg.type === 'offer' && msg.from && msg.sdp) {
               void handleOffer(msg.from, msg.sdp, channelId).catch((e) =>
@@ -354,7 +488,14 @@ export function createWebRTCVoiceModule(): VoiceModule {
     };
   };
 
-  const INPUT_LEVEL_INTERVAL_MS = 80;
+  const onPeersChange = (listener: (peerIds: string[]) => void): (() => void) => {
+    peerListeners.push(listener);
+    listener(Array.from(peerConnections.keys()).sort());
+    return () => {
+      const i = peerListeners.indexOf(listener);
+      if (i >= 0) peerListeners.splice(i, 1);
+    };
+  };
 
   function parseLevelFromStats(stats: unknown): number {
     let level = 0;
@@ -398,40 +539,12 @@ export function createWebRTCVoiceModule(): VoiceModule {
   }
 
   const subscribeToInputLevel = (callback: (level: number) => void): (() => void) => {
-    let cancelled = false;
-    const poll = async () => {
-      if (cancelled || !localStream) {
-        callback(0);
-        return;
-      }
-      const audioTrack = localStream.getAudioTracks()[0];
-      const pc = peerConnections.values().next().value as RTCPeerConnection | undefined;
-      if (!pc) {
-        callback(0);
-        return;
-      }
-      try {
-        let stats: unknown;
-        if (audioTrack) {
-          try {
-            stats = await pc.getStats(audioTrack);
-          } catch {
-            stats = await pc.getStats();
-          }
-        } else {
-          stats = await pc.getStats();
-        }
-        const level = parseLevelFromStats(stats);
-        if (!cancelled) callback(level);
-      } catch {
-        if (!cancelled) callback(0);
-      }
-    };
-    poll();
-    const id = setInterval(poll, INPUT_LEVEL_INTERVAL_MS);
+    // `getStats()` polling has proven unstable on Android in this build and can crash
+    // after a channel has been established. Keep the visualizer disabled until the
+    // media path is stable, then reintroduce it behind an explicit flag.
+    callback(0);
     return () => {
-      cancelled = true;
-      clearInterval(id);
+      callback(0);
     };
   };
 
@@ -443,6 +556,7 @@ export function createWebRTCVoiceModule(): VoiceModule {
     setGlobalMute,
     getState,
     onStateChange,
+    onPeersChange,
     subscribeToInputLevel,
   };
 }

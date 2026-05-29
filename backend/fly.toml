@@ -1,0 +1,48 @@
+# Fly.io application config for the Bike Chat backend.
+# `fly launch` will fill in `app` interactively the first time — replace below.
+
+app = "REPLACE-WITH-YOUR-APP-NAME"
+primary_region = "syd"  # Pick a region close to your users.
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  # Quieter logs in production. Override with `fly secrets set` if debugging.
+  REQUEST_LOGS = "0"
+  WS_LOGS = "0"
+  # Uncomment after creating the volume below to persist presence across restarts:
+  # PRESENCE_SNAPSHOT_PATH = "/data/presence.json"
+
+[http_service]
+  internal_port = 3001
+  force_https = true        # mobile WebSocket APIs require wss://
+  # Long-lived WebSockets (signalling + push) — don't let Fly stop the machine.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 800
+    hard_limit = 1000
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/healthz"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+# Uncomment after `fly volumes create presence_data --size 1 --region <region>`
+# to persist presence/groups across restarts (see PRESENCE_SNAPSHOT_PATH above):
+# [mounts]
+#   source = "presence_data"
+#   destination = "/data"

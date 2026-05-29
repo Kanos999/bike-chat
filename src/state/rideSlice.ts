@@ -69,6 +69,11 @@ const cleanupRideHandles = async (handles?: RideSessionHandles | null) => {
 
   if (handles.channelPollTimeout) clearTimeout(handles.channelPollTimeout);
   if (handles.presenceTimeout) clearTimeout(handles.presenceTimeout);
+  if (handles.controlReconnectTimeout) clearTimeout(handles.controlReconnectTimeout);
+  if (handles.controlSocket) {
+    try { handles.controlSocket.close(); } catch { /* ignore */ }
+    handles.controlSocket = undefined;
+  }
   if (handles.unsubscribeHeadset) handles.unsubscribeHeadset();
   if (handles.unsubscribeHelmet) handles.unsubscribeHelmet();
   if (handles.unsubscribeAudioRoute) handles.unsubscribeAudioRoute();
@@ -256,11 +261,99 @@ export const createRideSlice: StateCreator<
         }, delayMs);
       };
 
+      // Server-push channel-assignment over WebSocket. When healthy, the matcher
+      // tells us about channel/member changes immediately; the poll loop above
+      // backs off to a 15s heartbeat as a safety net.
+      const controlSocketUrl = (): string => {
+        const base = config.apiBaseUrl.replace(/^http(s?):/i, 'ws$1:').replace(/\/$/, '');
+        const params = new URLSearchParams({ riderId });
+        const token = config.authToken;
+        if (token) params.set('token', token);
+        return `${base}/presence/subscribe?${params.toString()}`;
+      };
+
+      let reconnectDelayMs = CONTROL_SOCKET_RECONNECT_MIN_MS;
+
+      const openControlSocket = (): void => {
+        if (!isRideSessionCurrent(sessionId)) return;
+        if (handles.controlSocket) return;
+        let ws: WebSocket;
+        try {
+          ws = new WebSocket(controlSocketUrl());
+        } catch (e) {
+          logRide('controlSocket.create.error', {
+            message: e instanceof Error ? e.message : String(e),
+          });
+          scheduleControlReconnect();
+          return;
+        }
+        handles.controlSocket = ws;
+
+        ws.onopen = () => {
+          if (!isRideSessionCurrent(sessionId)) {
+            try { ws.close(); } catch {}
+            return;
+          }
+          pushActive.value = true;
+          reconnectDelayMs = CONTROL_SOCKET_RECONNECT_MIN_MS;
+          logRide('controlSocket.open');
+        };
+
+        ws.onmessage = (event: WebSocketMessageEvent) => {
+          if (!isRideSessionCurrent(sessionId)) return;
+          try {
+            const msg = JSON.parse(String(event.data)) as
+              | (NearbyChannelResponse & { type: 'channel' })
+              | { type: string };
+            if ((msg as { type?: string }).type !== 'channel') return;
+            const snap = msg as NearbyChannelResponse;
+            logRide('controlSocket.channel', {
+              channelId: snap.channelId,
+              members: snap.members?.map((m) => m.riderId) ?? [],
+            });
+            void enqueueSnapshot({
+              channelId: snap.channelId,
+              members: Array.isArray(snap.members) ? snap.members : [],
+            });
+          } catch (e) {
+            logRide('controlSocket.message.parse.error', {
+              message: e instanceof Error ? e.message : String(e),
+            });
+          }
+        };
+
+        ws.onerror = () => {
+          // 'close' will fire next; do the reconnect bookkeeping there.
+        };
+
+        ws.onclose = () => {
+          pushActive.value = false;
+          if (handles.controlSocket === ws) handles.controlSocket = undefined;
+          logRide('controlSocket.close');
+          if (!isRideSessionCurrent(sessionId)) return;
+          scheduleControlReconnect();
+          // Fall back to fast polling immediately so the safety-net heartbeat
+          // shortens to ~2s while the push is down.
+          if (channelPollingStarted.value) scheduleChannelPoll(0);
+        };
+      };
+
+      const scheduleControlReconnect = (): void => {
+        if (handles.controlReconnectTimeout) clearTimeout(handles.controlReconnectTimeout);
+        const delay = reconnectDelayMs;
+        reconnectDelayMs = Math.min(reconnectDelayMs * 2, CONTROL_SOCKET_RECONNECT_MAX_MS);
+        handles.controlReconnectTimeout = setTimeout(() => {
+          handles.controlReconnectTimeout = undefined;
+          openControlSocket();
+        }, delay);
+      };
+
       const ensureChannelPollingStarted = () => {
         if (channelPollingStarted.value) return;
         channelPollingStarted.value = true;
         logRide('channel.poll.started', { intervalMs: nextPollDelayMs() });
         scheduleChannelPoll(0);
+        openControlSocket();
       };
 
       const sendPresence = async (

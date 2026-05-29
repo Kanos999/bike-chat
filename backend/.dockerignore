@@ -3,5 +3,9 @@ dist
 *.log
 .env*
 .git
+.DS_Store
 README.md
 DEPLOY.md
+Dockerfile
+.dockerignore
+fly.toml

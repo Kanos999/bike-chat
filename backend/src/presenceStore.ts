@@ -224,6 +224,12 @@ let channelSeq = 0;
 let lastComputedAt = 0;
 let recomputeIntervalMs = DEFAULT_RECOMPUTE_INTERVAL_MS;
 let recomputeInFlight: Promise<void> | null = null;
+// Bumped on every presence change. ensureGroupsFresh compares this against the
+// version captured at the *start* of the last recompute — so writes that arrive
+// during a recompute force a follow-up pass instead of being absorbed into the
+// stale snapshot.
+let mutationVersion = 0;
+let lastComputedVersion = -1;
 
 // Fired after each recompute so the push subscribers know to re-evaluate. Single
 // callback (overwrites) — sufficient for this app's transport layer.
@@ -250,11 +256,20 @@ export async function configurePresenceStore(
   channelSeq = 0;
   lastComputedAt = 0;
   recomputeInFlight = null;
+  mutationVersion = 0;
+  lastComputedVersion = -1; // forces the first read to recompute
   recomputeIntervalMs = options?.recomputeIntervalMs ?? DEFAULT_RECOMPUTE_INTERVAL_MS;
 }
 
 export async function upsertPresence(update: PresenceUpdate): Promise<void> {
   await repository.upsert(update);
+  // Bump the version so the next read knows the cache is stale. We deliberately
+  // *don't* trigger a recompute here: writes arrive one rider at a time, and
+  // recomputing between sequential writes makes the matcher see incoherent
+  // half-moved-group states (which breaks sticky-id reuse and produces spurious
+  // splits/merges). The subscribe layer drives recomputes on a fixed cadence
+  // instead, which naturally coalesces bursts.
+  mutationVersion += 1;
 }
 
 function isActiveMode(mode: PresenceUpdate['rideMode']): mode is 'OPEN' | 'FRIENDS_ONLY' {
@@ -430,12 +445,34 @@ async function recomputeGroups(): Promise<void> {
 }
 
 async function ensureGroupsFresh(): Promise<void> {
-  if (lastComputedAt !== 0 && Date.now() - lastComputedAt < recomputeIntervalMs) return;
-  if (!recomputeInFlight) {
-    recomputeInFlight = recomputeGroups().finally(() => {
+  // Serve the cached groups when nothing has changed *and* the cache is recent.
+  if (
+    mutationVersion === lastComputedVersion &&
+    lastComputedAt !== 0 &&
+    Date.now() - lastComputedAt < recomputeIntervalMs
+  ) {
+    return;
+  }
+
+  // A recompute is already running — wait for it. But because writes may have
+  // landed *after* it started, we may need to kick another pass once it's done.
+  if (recomputeInFlight) {
+    await recomputeInFlight;
+    if (mutationVersion !== lastComputedVersion) await ensureGroupsFresh();
+    return;
+  }
+
+  // Capture the version *at the start* of the recompute. If a write arrives
+  // mid-compute, `mutationVersion` will move ahead and the next ensure call
+  // will trigger another pass instead of being absorbed by the time-throttle.
+  const versionAtStart = mutationVersion;
+  recomputeInFlight = recomputeGroups()
+    .then(() => {
+      lastComputedVersion = versionAtStart;
+    })
+    .finally(() => {
       recomputeInFlight = null;
     });
-  }
   await recomputeInFlight;
 }
 
@@ -479,7 +516,10 @@ let pruneInterval: NodeJS.Timeout | null = null;
 
 export function startPruneInterval(): void {
   if (pruneInterval) return;
-  pruneInterval = setInterval(() => {
-    void repository.pruneExpired();
+  pruneInterval = setInterval(async () => {
+    await repository.pruneExpired();
+    // Expired riders leaving may break a group — bump the version so the next
+    // subscriber tick (or next read) picks up the change.
+    mutationVersion += 1;
   }, 30_000);
 }

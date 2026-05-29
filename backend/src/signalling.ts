@@ -34,7 +34,18 @@ function removeSocketForRider(riderId: string, ws: import('ws').WebSocket): void
 }
 
 export function startSignallingServer(server: import('http').Server, auth: AuthContextLike): void {
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  // noServer + per-path upgrade router: a path-bound WebSocketServer would
+  // actively reject upgrades targeting *other* paths (e.g. /presence/subscribe)
+  // with HTTP 400, breaking sibling WS endpoints on the same http.Server.
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (req, socket, head) => {
+    const reqUrl = new URL(req.url ?? '', `http://${req.headers.host}`);
+    if (reqUrl.pathname !== '/ws') return; // let another listener handle
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  });
 
   wss.on('connection', (ws, req) => {
     const url = new URL(req.url ?? '', `http://${req.headers.host}`);

@@ -29,15 +29,70 @@ Test: `curl -X POST http://localhost:3001/presence -H "Content-Type: application
 
 | Variable | Description |
 |----------|-------------|
-| `PORT`   | Port the server listens on (default `3001`). Many PaaS set this automatically. |
+| `PORT` | Port the server listens on (default `3001`). Many PaaS set this automatically. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Enable Supabase-issued bearer-token auth on `/presence`, `/presence/channel`, `/ws`, and `/presence/subscribe`. **Set both before exposing the backend to the internet** — otherwise the server runs in `authMode: "none"` and anyone can write presence or open signalling sockets. |
+| `AUTH_TOKEN` | Alternative to Supabase: a single shared bearer token. Useful for closed deployments. If set alongside Supabase, either accepted token authorises. |
+| `PRESENCE_SNAPSHOT_PATH` | Optional. Path to a JSON file the in-memory presence store flushes to on writes — survives restarts. Point at a path on a persistent volume. |
+| `REQUEST_LOGS`, `WS_LOGS` | Default on. Set to `0` (or `false`/`off`) to silence per-request HTTP/WS logs in production. |
 
-No secrets required for the current MVP.
+Confirm auth is wired by hitting `/readyz` on the deployed host — it returns `{"authMode":"supabase"}` (or `"shared-token"`) when correctly configured.
 
 ---
 
 ## 4. Deploy (pick one)
 
-### A. PaaS (Railway / Render)
+### A. Fly.io (recommended)
+
+Fly.io fits this backend well: native long-lived WebSocket support, auto-TLS, one small VM is enough (~$3–5/mo for an MVP), and you can pick a region close to your users. The repo already contains a working `backend/Dockerfile` and `backend/fly.toml`.
+
+1. **Install flyctl & sign in**
+   ```bash
+   brew install flyctl      # macOS — or: curl -L https://fly.io/install.sh | sh
+   fly auth signup          # or `fly auth login`
+   ```
+
+2. **Launch the app** (run from `backend/`)
+   ```bash
+   cd backend
+   fly launch --no-deploy
+   ```
+   When prompted:
+   - **App name** — pick one; flyctl will update `app =` in `fly.toml`.
+   - **Region** — confirm or change `primary_region` in `fly.toml` to a region close to your users.
+   - **Postgres / Redis / Sentry** — no.
+   - **Use existing `fly.toml`?** — yes.
+
+3. **Set auth secrets** (do this *before* the first deploy, otherwise the API is open)
+   ```bash
+   fly secrets set \
+     SUPABASE_URL='https://<your-project>.supabase.co' \
+     SUPABASE_ANON_KEY='<your-anon-key>'
+   # …or a shared token:
+   # fly secrets set AUTH_TOKEN='a-long-random-string'
+   ```
+
+4. **(Optional) Persistent presence**
+   ```bash
+   fly volumes create presence_data --size 1 --region <your-region>
+   ```
+   Then uncomment the `[mounts]` block and the `PRESENCE_SNAPSHOT_PATH` env line in `fly.toml`.
+
+5. **Deploy**
+   ```bash
+   fly deploy
+   ```
+
+6. **Verify**
+   ```bash
+   fly status                                # 1 machine, healthy
+   curl https://<app>.fly.dev/healthz        # {"ok":true}
+   curl https://<app>.fly.dev/readyz         # confirms authMode
+   fly logs                                  # tail to watch traffic
+   ```
+
+The mobile app should target `https://<app>.fly.dev` (see step 6 of this doc) — the client's WebSocket URLs are derived from that base by swapping the scheme, so signalling and `/presence/subscribe` automatically go over `wss://`.
+
+### B. PaaS (Railway / Render)
 
 1. Connect your repo.
 2. Set **root** or **build directory** to `backend`.

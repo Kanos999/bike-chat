@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the app background (#060606 from src/components/bikerTheme.ts) so
+         the launcher mask blends with the icon, regardless of mask shape. -->
+    <color name="ic_launcher_background">#060606</color>
+</resources>

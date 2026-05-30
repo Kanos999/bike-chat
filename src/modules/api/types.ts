@@ -7,6 +7,10 @@ export interface PresenceUpdate {
   /** Optional rider velocity. Lets the matcher gate by heading at road speeds. */
   headingDeg?: number | null;
   speedKph?: number | null;
+  /** Active crew id when riding FRIENDS_ONLY (scopes the channel to the crew). */
+  groupId?: string | null;
+  /** Rider ids this rider has blocked; a block prevents linking either way. */
+  blockedRiderIds?: string[];
 }
 
 export interface ChannelMemberSummary {

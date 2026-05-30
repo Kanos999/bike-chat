@@ -276,12 +276,32 @@ function isActiveMode(mode: PresenceUpdate['rideMode']): mode is 'OPEN' | 'FRIEN
   return mode === 'OPEN' || mode === 'FRIENDS_ONLY';
 }
 
+// True when either rider has blocked the other. Blocks are symmetric in effect:
+// a single block severs the link in both directions, in any mode.
+function eitherBlocks(a: StoredPresence, b: StoredPresence): boolean {
+  return (
+    (a.blockedRiderIds?.includes(b.riderId) ?? false) ||
+    (b.blockedRiderIds?.includes(a.riderId) ?? false)
+  );
+}
+
 // Symmetric compatibility: a link only exists when both riders are in the same
 // mode. OPEN talks to OPEN, FRIENDS_ONLY only to FRIENDS_ONLY — so a private crew
 // is never pulled into an open rider's channel (this also removes the old
 // one-sided "phantom channel" the asymmetric rule produced).
+//
+// Two extra gates layered on top:
+//   - blocks: a block from either side severs the link in every mode.
+//   - crews: FRIENDS_ONLY riders only link when they share the same non-null
+//     groupId, so a private crew's channel is scoped to its members (two
+//     unrelated FRIENDS_ONLY riders no longer collide just by being nearby).
 function canLink(a: StoredPresence, b: StoredPresence): boolean {
-  return isActiveMode(a.rideMode) && a.rideMode === b.rideMode;
+  if (!isActiveMode(a.rideMode) || a.rideMode !== b.rideMode) return false;
+  if (eitherBlocks(a, b)) return false;
+  if (a.rideMode === 'FRIENDS_ONLY') {
+    return a.groupId != null && a.groupId === b.groupId;
+  }
+  return true;
 }
 
 function distanceMeters(a: StoredPresence, b: StoredPresence): number {
@@ -497,6 +517,18 @@ export async function getChannelSnapshotForRider(riderId: string): Promise<Nearb
     if (memberId === riderId) continue;
     const p = await repository.get(memberId);
     if (!p) continue;
+    // Hard block guarantee: a rider is never placed on a channel that contains
+    // someone they blocked, or someone who blocked them. Edge removal in canLink
+    // stops a *direct* pairing, but transitivity (A–B–C, A blocks C) can still
+    // pull a blocked rider into the same component — and a shared channelId means
+    // shared audio. So if any blocked relation is present we decline the channel
+    // entirely rather than leak a blocked rider's audio in.
+    if (
+      (me.blockedRiderIds?.includes(memberId) ?? false) ||
+      (p.blockedRiderIds?.includes(riderId) ?? false)
+    ) {
+      return { channelId: null, members: [] };
+    }
     members.push({
       riderId: memberId,
       rideMode: p.rideMode === 'OPEN' ? 'OPEN' : 'FRIENDS_ONLY',

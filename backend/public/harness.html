@@ -331,7 +331,21 @@
         peers: new Map(),
       };
 
-      els.apiBaseUrl.value = window.location.origin;
+      // Default to the deployed backend. Loading the harness anywhere (deployed
+      // host, a local backend, or even a file://) lands on the same target.
+      // Both fields persist via localStorage so reloads don't clobber overrides
+      // and you don't have to re-paste an auth token every time.
+      const DEFAULT_API_BASE_URL = 'https://bike-chat.fly.dev';
+      els.apiBaseUrl.value =
+        localStorage.getItem('bikechat.apiBaseUrl') || DEFAULT_API_BASE_URL;
+      els.authToken.value = localStorage.getItem('bikechat.authToken') || '';
+
+      els.apiBaseUrl.addEventListener('change', () => {
+        localStorage.setItem('bikechat.apiBaseUrl', els.apiBaseUrl.value.trim());
+      });
+      els.authToken.addEventListener('change', () => {
+        localStorage.setItem('bikechat.authToken', els.authToken.value.trim());
+      });
 
       function log(message, data) {
         const line = `[${new Date().toLocaleTimeString()}] ${message}${data ? ` ${JSON.stringify(data)}` : ''}`;

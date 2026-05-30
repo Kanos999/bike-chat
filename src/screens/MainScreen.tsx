@@ -21,6 +21,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Path, Rect } from 'react-native-svg';
+import BottomNav from '../components/BottomNav';
 import ConcentricRings from '../components/ConcentricRings';
 import RiderDot, { Rider } from '../components/RiderDot';
 import { accentFor, COLORS, FONT, HELMET_PATH, Mode } from '../components/bikerTheme';
@@ -29,17 +30,6 @@ import { services } from '../modules/services';
 import { useAppStore } from '../state/store';
 
 const WAVE_BARS = [5, 9, 14, 10, 7, 12, 6, 9, 5];
-
-const NAV_TABS: { label: string; active: boolean; d: string }[] = [
-  { label: 'Comms', active: true, d: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z' },
-  {
-    label: 'Groups',
-    active: false,
-    d: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
-  },
-  { label: 'Routes', active: false, d: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2z' },
-  { label: 'Profile', active: false, d: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
-];
 
 function formatDist(m: number): string {
   if (!m || m <= 0) return 'linked';
@@ -61,6 +51,8 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
   const rideMode = useAppStore((s) => s.rideMode);
   const ridePreference = useAppStore((s) => s.ridePreference);
   const username = useAppStore((s) => s.username);
+  const activeGroupId = useAppStore((s) => s.activeGroupId);
+  const groups = useAppStore((s) => s.groups);
   const matchedRiders = useAppStore((s) => s.matchedRiders);
   const connectedPeerIds = useAppStore((s) => s.connectedPeerIds);
   const currentChannelId = useAppStore((s) => s.currentChannelId);
@@ -70,7 +62,6 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
   const helmetConnected = useAppStore((s) => s.helmetConnected);
   const lastLocation = useAppStore((s) => s.lastLocation);
   const statusMessage = useAppStore((s) => s.statusMessage);
-  const lastSummary = useAppStore((s) => s.lastSummary);
   const startRide = useAppStore((s) => s.startRide);
   const endRide = useAppStore((s) => s.endRide);
 
@@ -89,6 +80,7 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
   const mode: Mode = isRiding ? (ridingGroup ? 'group' : 'open') : selectedPref;
   const isOpen = mode === 'open';
   const accent = accentFor(mode);
+  const activeGroupName = groups.find((g) => g.id === activeGroupId)?.name ?? null;
 
   // --- Riders on the radar: channel members, accent-lit when WebRTC-connected ---
   const riders = useMemo(
@@ -144,12 +136,6 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
     }
   };
 
-  const onNavTab = (label: string) => {
-    if (label === 'Profile') navigation.navigate('Settings');
-    else if (label === 'Routes' && lastSummary)
-      navigation.navigate('RideSummary', { summaryId: lastSummary.id });
-  };
-
   // GPS coordinates surfaced in the ride-active panel (formatted "lat, lon").
   const coordLabel = lastLocation ?? 'Acquiring GPS…';
 
@@ -171,7 +157,9 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top > 0 ? 14 : 46 }]}>
-          <Text style={styles.headerTitle}>{isOpen ? 'Open Comms' : 'Group: Crew'}</Text>
+          <Text style={styles.headerTitle}>
+            {isOpen ? 'Open Comms' : `Crew: ${activeGroupName ?? 'None'}`}
+          </Text>
           <View
             style={[
               styles.helmetChip,
@@ -303,29 +291,7 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
         </View>
 
         {/* Bottom nav */}
-        <View style={[styles.nav, { paddingBottom: insets.bottom > 0 ? 4 : 14 }]}>
-          {NAV_TABS.map((tab) => (
-            <Pressable key={tab.label} style={styles.navTab} onPress={() => onNavTab(tab.label)}>
-              <Svg width={19} height={19} viewBox="0 0 24 24" fill="none">
-                <Path
-                  d={tab.d}
-                  stroke={tab.active ? accent.base : 'rgba(255,255,255,0.2)'}
-                  strokeWidth={1.6}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </Svg>
-              <Text
-                style={[
-                  styles.navLabel,
-                  { color: tab.active ? accent.base : 'rgba(255,255,255,0.2)' },
-                ]}
-              >
-                {tab.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <BottomNav active="Comms" navigation={navigation} accent={accent} />
       </SafeAreaView>
     </View>
   );
@@ -602,17 +568,4 @@ const styles = StyleSheet.create({
   },
   rideGradientWrap: { borderRadius: 14, overflow: 'hidden' },
   rideText: { fontFamily: FONT, fontSize: 17, letterSpacing: 2.4, textTransform: 'uppercase' },
-
-  nav: {
-    height: 78,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.04)',
-    backgroundColor: 'rgba(12,12,12,0.95)',
-  },
-  navTab: { alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8 },
-  navLabel: { fontFamily: FONT, fontSize: 9, letterSpacing: 1.1, textTransform: 'uppercase' },
 });

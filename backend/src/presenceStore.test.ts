@@ -100,11 +100,11 @@ test('matches transitive nearby riders into one stable channel', async () => {
   assert.equal(c2, c3);
 });
 
-test('friends-only riders match each other when nearby', async () => {
+test('friends-only riders in the same crew match each other when nearby', async () => {
   await configurePresenceStore();
 
-  await upsertPresence({ riderId: 'friend-a', lat: 37.7749, lon: -122.4194, rideMode: 'FRIENDS_ONLY', timestamp: Date.now() });
-  await upsertPresence({ riderId: 'friend-b', lat: 37.77495, lon: -122.41945, rideMode: 'FRIENDS_ONLY', timestamp: Date.now() });
+  await upsertPresence({ riderId: 'friend-a', lat: 37.7749, lon: -122.4194, rideMode: 'FRIENDS_ONLY', timestamp: Date.now(), groupId: 'crew-x' });
+  await upsertPresence({ riderId: 'friend-b', lat: 37.77495, lon: -122.41945, rideMode: 'FRIENDS_ONLY', timestamp: Date.now(), groupId: 'crew-x' });
 
   const c1 = await getChannelForRider('friend-a');
   const c2 = await getChannelForRider('friend-b');
@@ -283,4 +283,47 @@ test('channel snapshot includes nearby member identities and distance', async ()
   assert.equal(snapshot.members[0].riderId, 'snap-b');
   assert.equal(snapshot.members[0].rideMode, 'OPEN');
   assert.ok(snapshot.members[0].distanceMeters > 0);
+});
+
+test('FRIENDS_ONLY riders in different crews do not pair', async () => {
+  await configurePresenceStore(undefined, { recomputeIntervalMs: 0 });
+
+  await upsertPresence({ riderId: 'a', lat: BASE.lat, lon: BASE.lon, rideMode: 'FRIENDS_ONLY', timestamp: Date.now(), groupId: 'crew-a' });
+  await upsertPresence({ riderId: 'b', lat: BASE.lat + latOffset(50), lon: BASE.lon, rideMode: 'FRIENDS_ONLY', timestamp: Date.now(), groupId: 'crew-b' });
+
+  assert.equal(await getChannelForRider('a'), null);
+});
+
+test('FRIENDS_ONLY riders with no crew do not pair', async () => {
+  await configurePresenceStore(undefined, { recomputeIntervalMs: 0 });
+
+  await upsertPresence({ riderId: 'a', lat: BASE.lat, lon: BASE.lon, rideMode: 'FRIENDS_ONLY', timestamp: Date.now() });
+  await upsertPresence({ riderId: 'b', lat: BASE.lat + latOffset(50), lon: BASE.lon, rideMode: 'FRIENDS_ONLY', timestamp: Date.now() });
+
+  assert.equal(await getChannelForRider('a'), null);
+});
+
+test('a block severs the link in both directions', async () => {
+  await configurePresenceStore(undefined, { recomputeIntervalMs: 0 });
+
+  await upsertPresence({ riderId: 'a', lat: BASE.lat, lon: BASE.lon, rideMode: 'OPEN', timestamp: Date.now(), blockedRiderIds: ['b'] });
+  await upsertPresence({ riderId: 'b', lat: BASE.lat + latOffset(50), lon: BASE.lon, rideMode: 'OPEN', timestamp: Date.now() });
+
+  assert.equal(await getChannelForRider('a'), null);
+  assert.equal(await getChannelForRider('b'), null);
+});
+
+test('a transitively-linked blocked rider makes both decline the channel', async () => {
+  await configurePresenceStore(undefined, { recomputeIntervalMs: 0 });
+
+  // a blocks c, but b sits between them so union-find pulls all three into one
+  // component. The hard block guarantee means a and c never share audio, so both
+  // decline the channel; b (no blocks) keeps one.
+  await upsertPresence({ riderId: 'a', lat: BASE.lat, lon: BASE.lon, rideMode: 'OPEN', timestamp: Date.now(), blockedRiderIds: ['c'] });
+  await upsertPresence({ riderId: 'b', lat: BASE.lat + latOffset(40), lon: BASE.lon, rideMode: 'OPEN', timestamp: Date.now() });
+  await upsertPresence({ riderId: 'c', lat: BASE.lat + latOffset(80), lon: BASE.lon, rideMode: 'OPEN', timestamp: Date.now() });
+
+  assert.equal(await getChannelForRider('a'), null);
+  assert.equal(await getChannelForRider('c'), null);
+  assert.ok((await getChannelSnapshotForRider('b')).channelId, 'b has no block, keeps a channel');
 });

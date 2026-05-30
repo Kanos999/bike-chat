@@ -1,127 +1,165 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import ScreenScaffold from '../components/ScreenScaffold';
+import { Card, GhostButton, ListRow, Muted, PrimaryButton, SectionLabel, TextField } from '../components/ui';
+import { accentFor, FONT } from '../components/bikerTheme';
+import { JOIN_ALERTS, playJoinAlert } from '../modules/notify/joinAlert';
 import type { AppNavigation } from '../app/App';
 import { useAppStore } from '../state/store';
 
-const SettingsScreen = ({ navigation }: { navigation: AppNavigation }) => {
-  const username = useAppStore((state) => state.username);
-  const ridePreference = useAppStore((state) => state.ridePreference);
-  const audioRoute = useAppStore((state) => state.audioRoute);
-  const helmetConnected = useAppStore((state) => state.helmetConnected);
-  const setUsername = useAppStore((state) => state.setUsername);
-  const logout = useAppStore((state) => state.logout);
-  const authLoading = useAppStore((state) => state.authLoading);
+const accent = accentFor('open');
+
+export default function SettingsScreen({ navigation }: { navigation: AppNavigation }) {
+  const username = useAppStore((s) => s.username);
+  const session = useAppStore((s) => s.session);
+  const audioRoute = useAppStore((s) => s.audioRoute);
+  const helmetConnected = useAppStore((s) => s.helmetConnected);
+  const authLoading = useAppStore((s) => s.authLoading);
+  const joinAlert = useAppStore((s) => s.joinAlert);
+  const blockedUsernames = useAppStore((s) => s.blockedUsernames);
+  const setUsername = useAppStore((s) => s.setUsername);
+  const syncProfile = useAppStore((s) => s.syncProfile);
+  const setJoinAlert = useAppStore((s) => s.setJoinAlert);
+  const addBlock = useAppStore((s) => s.addBlock);
+  const removeBlock = useAppStore((s) => s.removeBlock);
+  const logout = useAppStore((s) => s.logout);
 
   const [draftUsername, setDraftUsername] = useState(username);
   const [saving, setSaving] = useState(false);
+  const [newBlock, setNewBlock] = useState('');
 
   useEffect(() => {
     setDraftUsername(username);
   }, [username]);
 
-  const handleSave = async () => {
+  const dirty = draftUsername.trim() !== username.trim() && draftUsername.trim().length > 0;
+
+  const onSave = async () => {
     setSaving(true);
     try {
-      await setUsername(draftUsername.trim());
+      const name = draftUsername.trim();
+      await setUsername(name);
+      await syncProfile(name);
     } finally {
       setSaving(false);
     }
   };
 
+  const onAddBlock = async () => {
+    if (!newBlock.trim()) return;
+    await addBlock(newBlock.trim());
+    setNewBlock('');
+  };
+
   return (
-    <LinearGradient
-      colors={['#0b0f13', '#10161d', '#171d24']}
-      start={{ x: 0.1, y: 0 }}
-      end={{ x: 0.95, y: 1 }}
-      style={{ flex: 1 }}
-    >
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <View className="px-5 pt-7 pb-10">
-          <Text className="text-[11px] uppercase tracking-[3px] text-[#f4a261]">Configuration</Text>
-          <Text className="mt-2 text-[30px] font-bold leading-[36px] text-white">Rider profile & audio routing</Text>
-          <Text className="mt-3 text-sm leading-6 text-[#9fb0bf]">
-            Keep your rider identity stable, and let the app prefer your helmet or intercom microphone whenever Android exposes it.
-          </Text>
+    <ScreenScaffold title="Profile" navigation={navigation} activeTab="Profile" accent={accent}>
+      <Card>
+        <SectionLabel>Identity</SectionLabel>
+        <Muted>Your callsign is shown to nearby riders and is how crews and blocks find you.</Muted>
+        <TextField
+          style={styles.field}
+          value={draftUsername}
+          onChangeText={setDraftUsername}
+          placeholder="Your callsign"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <PrimaryButton
+          label={saving ? 'Saving' : 'Save callsign'}
+          onPress={onSave}
+          accent={accent}
+          loading={saving}
+          disabled={!dirty}
+        />
+      </Card>
 
-          <View className="mt-6 rounded-[28px] border border-white/10 bg-[#121920] px-4 py-4">
-            <Text className="text-[11px] uppercase tracking-[3px] text-bike-text-muted">Identity</Text>
-            <Text className="mt-3 text-sm leading-6 text-[#9fb0bf]">
-              This handle is used for presence, channel membership, and the rider bubbles shown to peers nearby.
-            </Text>
-            <TextInput
-              className="mt-4 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-base text-white"
-              value={draftUsername}
-              onChangeText={setDraftUsername}
-              placeholder="Your callsign"
-              placeholderTextColor="#607080"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              className={`mt-4 items-center rounded-[22px] bg-[#ff6b35] px-4 py-4 ${saving ? 'opacity-70' : ''}`}
-              onPress={handleSave}
-              disabled={saving}
-              activeOpacity={0.88}
-            >
-              <Text className="text-sm font-bold uppercase tracking-[2px] text-black">
-                {saving ? 'Saving' : 'Save profile'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+      <Card>
+        <SectionLabel>Account</SectionLabel>
+        <ListRow label="Phone" right={<Text style={styles.value}>{session?.user.phone || '—'}</Text>} />
+        <View style={styles.divider} />
+        <GhostButton label={authLoading ? 'Signing out…' : 'Sign out'} onPress={logout} disabled={authLoading} danger />
+      </Card>
 
-          <View className="mt-5 rounded-[28px] border border-white/10 bg-[#121920] px-4 py-4">
-            <Text className="text-[11px] uppercase tracking-[3px] text-bike-text-muted">Audio path</Text>
-            <View className="mt-4 gap-3">
-              <View className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4">
-                <Text className="text-xs uppercase tracking-[2px] text-bike-text-muted">Helmet link</Text>
-                <Text className={`mt-1 text-base font-semibold ${helmetConnected ? 'text-emerald-300' : 'text-amber-200'}`}>
-                  {helmetConnected ? 'Intercom available' : 'No intercom detected'}
-                </Text>
-              </View>
-              <View className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4">
-                <Text className="text-xs uppercase tracking-[2px] text-bike-text-muted">Current route</Text>
-                <Text className="mt-1 text-base font-semibold text-white">{audioRoute}</Text>
-                <Text className="mt-2 text-sm leading-6 text-[#9fb0bf]">
-                  During ride mode the app switches Android into communication mode and prefers Bluetooth intercom audio over the phone microphone whenever the device is available.
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View className="mt-5 rounded-[28px] border border-white/10 bg-[#121920] px-4 py-4">
-            <Text className="text-[11px] uppercase tracking-[3px] text-bike-text-muted">Defaults</Text>
-            <View className="mt-4 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4">
-              <Text className="text-xs uppercase tracking-[2px] text-bike-text-muted">Preferred ride mode</Text>
-              <Text className="mt-1 text-base font-semibold text-white">
-                {ridePreference ?? 'Choose per ride from Home'}
-              </Text>
-            </View>
-          </View>
-
-          <View className="mt-5 flex-row gap-3">
-            <TouchableOpacity
-              className="flex-1 items-center rounded-[22px] border border-white/10 bg-white/5 px-4 py-4"
-              onPress={() => navigation.goBack()}
-              activeOpacity={0.88}
-            >
-              <Text className="text-sm font-semibold text-white">Back</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="flex-1 items-center rounded-[22px] border border-red-500/40 bg-red-500/12 px-4 py-4"
-              onPress={logout}
-              disabled={authLoading}
-              activeOpacity={0.88}
-            >
-              <Text className="text-sm font-semibold text-red-200">
-                {authLoading ? 'Signing out...' : 'Sign out'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+      <Card>
+        <SectionLabel>Rider-join alert</SectionLabel>
+        <Muted>Buzz when a rider joins your channel mid-ride.</Muted>
+        <View style={styles.segment}>
+          {JOIN_ALERTS.map((opt) => {
+            const on = opt.id === joinAlert;
+            return (
+              <Pressable
+                key={opt.id}
+                onPress={() => {
+                  void setJoinAlert(opt.id);
+                  playJoinAlert(opt.id);
+                }}
+                style={[
+                  styles.seg,
+                  { backgroundColor: on ? accent.base : 'transparent', borderColor: on ? accent.base : 'rgba(255,255,255,0.1)' },
+                ]}
+              >
+                <Text style={[styles.segText, { color: on ? '#000' : 'rgba(255,255,255,0.5)' }]}>{opt.label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
-      </ScrollView>
-    </LinearGradient>
-  );
-};
+      </Card>
 
-export default SettingsScreen;
+      <Card>
+        <SectionLabel>Blocked riders</SectionLabel>
+        <Muted>You never share a channel with a blocked rider, in any mode.</Muted>
+        <View style={styles.addRow}>
+          <TextField
+            style={styles.addField}
+            value={newBlock}
+            onChangeText={setNewBlock}
+            placeholder="Callsign to block"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Pressable onPress={onAddBlock} style={styles.addBtn}>
+            <Text style={[styles.link, { color: accent.base }]}>Block</Text>
+          </Pressable>
+        </View>
+        {blockedUsernames.length === 0 ? (
+          <Muted>No blocked riders.</Muted>
+        ) : (
+          blockedUsernames.map((u) => (
+            <ListRow
+              key={u}
+              label={u}
+              right={
+                <Pressable onPress={() => void removeBlock(u)}>
+                  <Text style={[styles.link, { color: 'rgba(255,255,255,0.55)' }]}>Unblock</Text>
+                </Pressable>
+              }
+            />
+          ))
+        )}
+      </Card>
+
+      <Card>
+        <SectionLabel>Audio path</SectionLabel>
+        <ListRow
+          label="Helmet link"
+          right={<Text style={[styles.value, { color: helmetConnected ? accent.base : 'rgba(255,255,255,0.5)' }]}>{helmetConnected ? 'Connected' : 'Phone audio'}</Text>}
+        />
+        <View style={styles.divider} />
+        <ListRow label="Current route" right={<Text style={styles.value}>{audioRoute}</Text>} />
+      </Card>
+    </ScreenScaffold>
+  );
+}
+
+const styles = StyleSheet.create({
+  field: { marginTop: 12, marginBottom: 14 },
+  value: { fontFamily: FONT, fontSize: 14, letterSpacing: 0.8, color: '#fff', textTransform: 'uppercase' },
+  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
+  segment: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  seg: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  segText: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase' },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, marginBottom: 6 },
+  addField: { flex: 1, marginTop: 0 },
+  addBtn: { paddingHorizontal: 6, paddingVertical: 8 },
+  link: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.4, textTransform: 'uppercase' },
+});

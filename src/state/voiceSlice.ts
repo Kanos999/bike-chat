@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { services } from '../modules/services';
 import { IntercomState } from '../modules/voice/types';
+import { GroupsSlice } from './groupsSlice';
 import { RideSessionHandles } from './types';
 
 function samePeerIds(a: string[], b: string[]): boolean {
@@ -24,8 +25,10 @@ export interface VoiceSlice {
   setIntercomState: (state: IntercomState) => void;
 }
 
+type Store = VoiceSlice & GroupsSlice;
+
 export const createVoiceSlice: StateCreator<
-  VoiceSlice,
+  Store,
   [['zustand/devtools', never]],
   [],
   VoiceSlice
@@ -58,7 +61,12 @@ export const createVoiceSlice: StateCreator<
   attachVoicePeerListener: (handles) => {
     if (handles.unsubscribeVoicePeers || !services.voice.onPeersChange) return;
     handles.unsubscribeVoicePeers = services.voice.onPeersChange((peerIds) => {
-      set((current) => (samePeerIds(current.connectedPeerIds, peerIds) ? current : { connectedPeerIds: peerIds }));
+      const prev = get().connectedPeerIds;
+      if (samePeerIds(prev, peerIds)) return;
+      // A peer appearing in the WebRTC mesh is the real "rider joined" moment.
+      const someoneJoined = peerIds.some((id) => !prev.includes(id));
+      set({ connectedPeerIds: peerIds });
+      if (someoneJoined) get().notifyJoin();
     });
   },
   setIntercomState: (state) =>

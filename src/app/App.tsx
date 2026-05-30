@@ -4,19 +4,21 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MainScreen from '../screens/MainScreen';
 import RideSummaryScreen from '../screens/RideSummaryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import GroupsScreen from '../screens/GroupsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import { config } from '../config';
 import { services } from '../modules/services';
 import { loadProfile } from '../state/profileStorage';
 import { useAppStore } from '../state/store';
 
-export type ScreenName = 'Home' | 'Ride' | 'RideSummary' | 'Settings';
+export type ScreenName = 'Home' | 'Ride' | 'RideSummary' | 'Settings' | 'Groups';
 
 export type RootStackParamList = {
   Home: undefined;
   Ride: undefined;
   RideSummary: { summaryId?: string };
   Settings: undefined;
+  Groups: undefined;
 };
 
 export type AppNavigation = {
@@ -73,8 +75,16 @@ const AppInner = () => {
   }, [initializeAuth]);
 
   useEffect(() => {
-    loadProfile().then((profile) => useAppStore.getState().hydrateProfile(profile));
+    loadProfile().then((profile) => {
+      useAppStore.getState().hydrateProfile(profile);
+      useAppStore.getState().hydrateGroupPrefs(profile);
+    });
   }, []);
+
+  // Once signed in, pull the rider's crews + block list from Supabase.
+  useEffect(() => {
+    if (session) void useAppStore.getState().loadGroups();
+  }, [session]);
 
   useEffect(() => {
     services.analytics.getLastSummary().then((summary) => {
@@ -102,6 +112,8 @@ const AppInner = () => {
         return <RideSummaryScreen navigation={navigation} route={{ params: params as RootStackParamList['RideSummary'] }} />;
       case 'Settings':
         return <SettingsScreen navigation={navigation} />;
+      case 'Groups':
+        return <GroupsScreen navigation={navigation} />;
       default:
         return <MainScreen navigation={navigation} />;
     }

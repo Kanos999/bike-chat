@@ -17,4 +17,11 @@ export interface BluetoothModule {
   startVoiceRoute(): Promise<void>;
   stopVoiceRoute(): Promise<void>;
   onAudioRouteChange(listener: (route: AudioRoute) => void): () => void;
+  /**
+   * Play a short alert tone on the voice-call audio stream so it rides the active
+   * SCO link into the helmet intercom (a STREAM_MUSIC sound would be bumped to the
+   * phone speaker while the call holds SCO). Best-effort; optional on platforms
+   * without a native implementation. `kind` matches the JoinAlert style.
+   */
+  playJoinTone?(kind: string): void;
 }

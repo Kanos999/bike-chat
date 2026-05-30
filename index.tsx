@@ -3,8 +3,11 @@ import './global.css';
 import { AppRegistry } from 'react-native';
 import App from './src/app/App';
 
-// When running on a physical device, point API to your machine's LAN IP (see src/config.ts):
-(global as unknown as { __BikeChatApiBaseUrl?: string }).__BikeChatApiBaseUrl = 'http://192.168.0.79:3001';
+// Deployed backend on Fly.io. The client derives WebSocket URLs by swapping the
+// scheme, so /ws and /presence/subscribe automatically run over wss://.
+// For local backend testing on a physical device, swap this for your LAN IP, e.g.
+// 'http://192.168.0.79:3001'.
+(global as unknown as { __BikeChatApiBaseUrl?: string }).__BikeChatApiBaseUrl = 'https://bike-chat.fly.dev';
 
 AppRegistry.registerComponent('BikeChat', () => App);
 

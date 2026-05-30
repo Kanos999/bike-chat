@@ -67,6 +67,10 @@ app.post('/presence', authMiddleware, async (req, res) => {
     timestamp: body.timestamp ?? Date.now(),
     headingDeg: typeof body.headingDeg === 'number' ? body.headingDeg : null,
     speedKph: typeof body.speedKph === 'number' ? body.speedKph : null,
+    groupId: typeof body.groupId === 'string' ? body.groupId : null,
+    blockedRiderIds: Array.isArray(body.blockedRiderIds)
+      ? body.blockedRiderIds.filter((id): id is string => typeof id === 'string')
+      : [],
   });
   res.status(204).end();
 });

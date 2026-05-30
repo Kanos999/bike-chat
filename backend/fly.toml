@@ -1,7 +1,7 @@
 # Fly.io application config for the Bike Chat backend.
 # `fly launch` will fill in `app` interactively the first time — replace below.
 
-app = "REPLACE-WITH-YOUR-APP-NAME"
+app = "bike-chat"
 primary_region = "syd"  # Pick a region close to your users.
 
 [build]

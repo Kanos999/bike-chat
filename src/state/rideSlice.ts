@@ -8,7 +8,8 @@ import { RideMode, RidePreference, RideSessionHandles } from './types';
 import { AnalyticsSlice } from './analyticsSlice';
 import { ProximitySlice } from './proximitySlice';
 import { VoiceSlice } from './voiceSlice';
-import { saveProfile } from './profileStorage';
+import { GroupsSlice } from './groupsSlice';
+import { saveUsername } from './profileStorage';
 import type { StoredProfile } from './profileStorage';
 
 export interface RideSlice {
@@ -27,7 +28,7 @@ export interface RideSlice {
   endRide: () => Promise<void>;
 }
 
-type Store = RideSlice & ProximitySlice & VoiceSlice & AnalyticsSlice;
+type Store = RideSlice & ProximitySlice & VoiceSlice & AnalyticsSlice & GroupsSlice;
 
 const formatLocation = (lat: number, lon: number) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 // Tuned for early pairing: poll the channel often, and refresh a stationary
@@ -126,7 +127,7 @@ export const createRideSlice: StateCreator<
   setUsername: async (username) => {
     logRide('setUsername', { username });
     set({ username, riderId: username });
-    await saveProfile({ username });
+    await saveUsername(username);
     logRide('setUsername.saved', { username });
   },
   startRide: async (preference) => {
@@ -265,11 +266,13 @@ export const createRideSlice: StateCreator<
       // tells us about channel/member changes immediately; the poll loop above
       // backs off to a 15s heartbeat as a safety net.
       const controlSocketUrl = (): string => {
+        // Avoid URLSearchParams here: RN/Hermes ships an incomplete polyfill
+        // (`.set` isn't implemented), so we hand-build the query string.
         const base = config.apiBaseUrl.replace(/^http(s?):/i, 'ws$1:').replace(/\/$/, '');
-        const params = new URLSearchParams({ riderId });
+        const parts = [`riderId=${encodeURIComponent(riderId)}`];
         const token = config.authToken;
-        if (token) params.set('token', token);
-        return `${base}/presence/subscribe?${params.toString()}`;
+        if (token) parts.push(`token=${encodeURIComponent(token)}`);
+        return `${base}/presence/subscribe?${parts.join('&')}`;
       };
 
       let reconnectDelayMs = CONTROL_SOCKET_RECONNECT_MIN_MS;
@@ -396,6 +399,9 @@ export const createRideSlice: StateCreator<
             timestamp: now,
             headingDeg: loc.headingDeg,
             speedKph: loc.speedKph,
+            // FRIENDS_ONLY rides are scoped to the active crew; blocks apply always.
+            groupId: nextRideMode === 'FRIENDS_ONLY' ? get().activeGroupId : null,
+            blockedRiderIds: get().blockedUsernames,
           });
 
           if (!isRideSessionCurrent(sessionId)) return 'sent';
@@ -437,6 +443,8 @@ export const createRideSlice: StateCreator<
       let applyChain: Promise<void> = Promise.resolve();
       const applyChannelSnapshot = async (response: NearbyChannelResponse): Promise<void> => {
         if (!isRideSessionCurrent(sessionId)) return;
+        // Note: the rider-join alert fires off the actual WebRTC peer-connect event
+        // (see voiceSlice.attachVoicePeerListener), not channel-membership churn.
         get().setMatchedRiders(response.members);
         const current = get().currentChannelId;
         if (response.channelId !== current) {

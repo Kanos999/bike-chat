@@ -9,6 +9,7 @@ import { AnalyticsSlice } from './analyticsSlice';
 import { ProximitySlice } from './proximitySlice';
 import { VoiceSlice } from './voiceSlice';
 import { GroupsSlice } from './groupsSlice';
+import { RidesSlice } from './ridesSlice';
 import { saveUsername } from './profileStorage';
 import type { StoredProfile } from './profileStorage';
 
@@ -28,7 +29,7 @@ export interface RideSlice {
   endRide: () => Promise<void>;
 }
 
-type Store = RideSlice & ProximitySlice & VoiceSlice & AnalyticsSlice & GroupsSlice;
+type Store = RideSlice & ProximitySlice & VoiceSlice & AnalyticsSlice & GroupsSlice & RidesSlice;
 
 const formatLocation = (lat: number, lon: number) => `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 // Tuned for early pairing: poll the channel often, and refresh a stationary
@@ -45,6 +46,9 @@ const PRESENCE_MIN_MOVEMENT_SEND_INTERVAL_MS = 5_000;
 const CONTROL_SOCKET_RECONNECT_MIN_MS = 1_000;
 const CONTROL_SOCKET_RECONNECT_MAX_MS = 10_000;
 let activeRideSessionId = 0;
+// Every distinct rider that shared a channel with us this ride, accumulated across
+// snapshots and persisted with the ride in endRide. Reset at startRide.
+let sessionMatchedRiders = new Set<string>();
 
 const rideLogsEnabled = (): boolean => {
   const flag = (global as any)?.__BikeChatRideLogs;
@@ -142,6 +146,7 @@ export const createRideSlice: StateCreator<
       return;
     }
     const handles: RideSessionHandles = {};
+    sessionMatchedRiders = new Set<string>();
     set({ rideMode: 'INITIALISING', ridePreference: preference, statusMessage: 'Starting ride…' });
     get().clearProximity();
 
@@ -446,6 +451,8 @@ export const createRideSlice: StateCreator<
         // Note: the rider-join alert fires off the actual WebRTC peer-connect event
         // (see voiceSlice.attachVoicePeerListener), not channel-membership churn.
         get().setMatchedRiders(response.members);
+        // Accumulate everyone we shared a channel with, for the ride history.
+        for (const m of response.members) sessionMatchedRiders.add(m.riderId);
         const current = get().currentChannelId;
         if (response.channelId !== current) {
           if (response.channelId) {
@@ -601,6 +608,11 @@ export const createRideSlice: StateCreator<
     const riderId = get().riderId;
     const last = get().lastLocation;
 
+    // Capture ride context before the reset below clears it, for the history record.
+    const endedMode = get().ridePreference === 'FRIENDS_ONLY' ? 'FRIENDS_ONLY' : 'OPEN';
+    const endedGroupId = endedMode === 'FRIENDS_ONLY' ? get().activeGroupId : null;
+    const endedMatched = Array.from(sessionMatchedRiders);
+
     // Invalidate the active ride immediately, then let teardown finish in the background.
     get().setRecording(false);
     get().clearProximity();
@@ -638,6 +650,8 @@ export const createRideSlice: StateCreator<
 
     const summary = await services.analytics.endSession();
     get().setLastSummary(summary);
+    // Persist the ride + the riders we matched with to history (best-effort).
+    void get().saveRide(summary, endedMode, endedGroupId, endedMatched);
 
     logRide('analytics.session.ended');
 

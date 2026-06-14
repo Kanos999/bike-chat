@@ -1,16 +1,26 @@
 import { StateCreator } from 'zustand';
 import {
+  addGroupMember as addGroupMemberRequest,
   blockUser,
   createGroup as createGroupRequest,
   deleteGroup as deleteGroupRequest,
   fetchBlocks,
   fetchMembers,
   fetchMyGroups,
+  Friend,
+  FriendRequest,
   Group,
   GroupMember,
   joinGroupByCode,
   leaveGroup as leaveGroupRequest,
+  listFriendRequests,
+  listFriends,
+  removeFriend as removeFriendRequest,
+  removeGroupMember as removeGroupMemberRequest,
   renameGroup as renameGroupRequest,
+  respondFriendRequest,
+  searchUsers as searchUsersRequest,
+  sendFriendRequest as sendFriendRequestRequest,
   unblockUser,
   upsertProfile,
 } from '../modules/groups/supabaseData';
@@ -27,6 +37,10 @@ export interface GroupsSlice {
   joinAlert: JoinAlert;
   groupsLoading: boolean;
   groupsError: string | null;
+  // Social graph
+  friends: Friend[];
+  friendRequests: FriendRequest[];
+  userSearchResults: Friend[];
   hydrateGroupPrefs: (profile: StoredProfile) => void;
   loadGroups: () => Promise<void>;
   loadMembers: (groupId: string) => Promise<void>;
@@ -41,6 +55,17 @@ export interface GroupsSlice {
   setJoinAlert: (kind: JoinAlert) => Promise<void>;
   syncProfile: (username: string) => Promise<void>;
   notifyJoin: () => void;
+  // Friends
+  loadFriends: () => Promise<void>;
+  searchUsers: (query: string) => Promise<void>;
+  clearUserSearch: () => void;
+  sendFriendRequest: (username: string) => Promise<void>;
+  respondFriendRequest: (requesterId: string, accept: boolean) => Promise<void>;
+  removeFriend: (otherId: string) => Promise<void>;
+  // Friend-built crews
+  createCrewWithFriends: (name: string, friendIds: string[]) => Promise<Group | null>;
+  addCrewMember: (groupId: string, friend: Friend) => Promise<void>;
+  removeCrewMember: (groupId: string, memberId: string) => Promise<void>;
 }
 
 type Store = GroupsSlice & AuthSlice;
@@ -58,6 +83,9 @@ export const createGroupsSlice: StateCreator<
   joinAlert: DEFAULT_JOIN_ALERT,
   groupsLoading: false,
   groupsError: null,
+  friends: [],
+  friendRequests: [],
+  userSearchResults: [],
 
   hydrateGroupPrefs: (profile) =>
     set({ activeGroupId: profile.activeGroupId, joinAlert: profile.joinAlert }),
@@ -203,5 +231,114 @@ export const createGroupsSlice: StateCreator<
     // a vibration companion that also covers platforms without the native tone.
     services.bluetooth.playJoinTone?.(kind);
     playJoinAlert(kind);
+  },
+
+  /* ----- Friends ----- */
+
+  loadFriends: async () => {
+    try {
+      const [friends, friendRequests] = await Promise.all([listFriends(), listFriendRequests()]);
+      set({ friends, friendRequests });
+    } catch (e) {
+      set({ groupsError: e instanceof Error ? e.message : 'Failed to load friends' });
+    }
+  },
+
+  searchUsers: async (query) => {
+    const q = query.trim();
+    if (!q) {
+      set({ userSearchResults: [] });
+      return;
+    }
+    try {
+      const results = await searchUsersRequest(q);
+      set({ userSearchResults: results });
+    } catch (e) {
+      set({ groupsError: e instanceof Error ? e.message : 'Search failed' });
+    }
+  },
+
+  clearUserSearch: () => set({ userSearchResults: [] }),
+
+  sendFriendRequest: async (username) => {
+    const name = username.trim();
+    if (!name) return;
+    try {
+      await sendFriendRequestRequest(name);
+      await get().loadFriends();
+    } catch (e) {
+      set({ groupsError: e instanceof Error ? e.message : 'Failed to send request' });
+    }
+  },
+
+  respondFriendRequest: async (requesterId, accept) => {
+    try {
+      await respondFriendRequest(requesterId, accept);
+      await get().loadFriends();
+    } catch (e) {
+      set({ groupsError: e instanceof Error ? e.message : 'Failed to respond to request' });
+    }
+  },
+
+  removeFriend: async (otherId) => {
+    try {
+      await removeFriendRequest(otherId);
+      set((s) => ({ friends: s.friends.filter((f) => f.id !== otherId) }));
+    } catch (e) {
+      set({ groupsError: e instanceof Error ? e.message : 'Failed to remove friend' });
+    }
+  },
+
+  /* ----- Friend-built crews ----- */
+
+  createCrewWithFriends: async (name, friendIds) => {
+    set({ groupsError: null });
+    try {
+      const group = await createGroupRequest(name);
+      for (const memberId of friendIds) {
+        await addGroupMemberRequest(group.id, memberId);
+      }
+      set((s) => ({ groups: [...s.groups, group] }));
+      // Refresh the roster so the new members show immediately.
+      await get().loadMembers(group.id);
+      await get().setActiveGroup(group.id);
+      return group;
+    } catch (e) {
+      set({ groupsError: e instanceof Error ? e.message : 'Failed to create crew' });
+      return null;
+    }
+  },
+
+  addCrewMember: async (groupId, friend) => {
+    try {
+      await addGroupMemberRequest(groupId, friend.id);
+      set((s) => {
+        const existing = s.membersByGroup[groupId] ?? [];
+        if (existing.some((m) => m.member_id === friend.id)) return s;
+        const row: GroupMember = {
+          group_id: groupId,
+          member_id: friend.id,
+          username: friend.username,
+          joined_at: new Date().toISOString(),
+        };
+        return { membersByGroup: { ...s.membersByGroup, [groupId]: [...existing, row] } };
+      });
+    } catch (e) {
+      set({ groupsError: e instanceof Error ? e.message : 'Failed to add member' });
+    }
+  },
+
+  removeCrewMember: async (groupId, memberId) => {
+    try {
+      await removeGroupMemberRequest(groupId, memberId);
+      set((s) => ({
+        membersByGroup: {
+          ...s.membersByGroup,
+          [groupId]: (s.membersByGroup[groupId] ?? []).filter((m) => m.member_id !== memberId),
+        },
+      }));
+    } catch (e) {
+      set({ groupsError: e instanceof Error ? e.message : 'Failed to remove member' });
+    }
   },
 });

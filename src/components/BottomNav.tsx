@@ -32,6 +32,11 @@ interface Props {
 function BottomNav({ active, navigation, accent }: Props) {
   const insets = useSafeAreaInsets();
   const lastSummary = useAppStore((s) => s.lastSummary);
+  const incomingRequests = useAppStore(
+    (s) => s.friendRequests.filter((r) => r.direction === 'incoming').length,
+  );
+
+  const badgeFor = (label: NavTabLabel): number => (label === 'Groups' ? incomingRequests : 0);
 
   const onTab = (label: NavTabLabel) => {
     if (label === active) return;
@@ -56,11 +61,19 @@ function BottomNav({ active, navigation, accent }: Props) {
       {NAV_TABS.map((tab) => {
         const isActive = tab.label === active;
         const color = isActive ? accent.base : 'rgba(255,255,255,0.2)';
+        const badge = badgeFor(tab.label);
         return (
           <Pressable key={tab.label} style={styles.navTab} onPress={() => onTab(tab.label)}>
-            <Svg width={19} height={19} viewBox="0 0 24 24" fill="none">
-              <Path d={tab.d} stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
+            <View>
+              <Svg width={19} height={19} viewBox="0 0 24 24" fill="none">
+                <Path d={tab.d} stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              {badge > 0 ? (
+                <View style={[styles.badge, { backgroundColor: accent.base }]}>
+                  <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+                </View>
+              ) : null}
+            </View>
             <Text style={[styles.navLabel, { color }]}>{tab.label}</Text>
           </Pressable>
         );
@@ -82,6 +95,18 @@ const styles = StyleSheet.create({
   },
   navTab: { alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8 },
   navLabel: { fontFamily: FONT, fontSize: 9, letterSpacing: 1.1, textTransform: 'uppercase' },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -9,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { fontFamily: FONT, fontSize: 10, letterSpacing: 0.5, color: '#000' },
 });
 
 export default BottomNav;

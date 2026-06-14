@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MainScreen from '../screens/MainScreen';
 import RideSummaryScreen from '../screens/RideSummaryScreen';
@@ -81,9 +81,13 @@ const AppInner = () => {
     });
   }, []);
 
-  // Once signed in, pull the rider's crews + block list from Supabase.
+  // Once signed in, pull the rider's crews, friends, and ride history from Supabase.
   useEffect(() => {
-    if (session) void useAppStore.getState().loadGroups();
+    if (!session) return;
+    const store = useAppStore.getState();
+    void store.loadGroups();
+    void store.loadFriends();
+    void store.loadRides();
   }, [session]);
 
   useEffect(() => {
@@ -91,6 +95,14 @@ const AppInner = () => {
       if (summary) useAppStore.getState().setLastSummary(summary);
     });
   }, []);
+
+  // Keep visited screens mounted and toggle visibility, so tab switches are a style
+  // flip instead of an unmount/remount. Avoids re-paying each screen's mount cost
+  // (MainScreen's animated nodes + ring measure, GroupsScreen's loadGroups fetch).
+  // Screens are mounted lazily on first visit so we don't pay for unopened tabs.
+  // NOTE: must stay above the early returns below — hooks can't run conditionally.
+  const visited = React.useRef<Set<ScreenName>>(new Set([screen]));
+  visited.current.add(screen);
 
   if (!authReady) {
     return (
@@ -104,23 +116,43 @@ const AppInner = () => {
     return <LoginScreen />;
   }
 
-  const renderScreen = () => {
-    switch (screen) {
+  const screenFor = (name: ScreenName): React.ReactNode => {
+    switch (name) {
       case 'Home':
         return <MainScreen navigation={navigation} />;
       case 'RideSummary':
-        return <RideSummaryScreen navigation={navigation} route={{ params: params as RootStackParamList['RideSummary'] }} />;
+        return <RideSummaryScreen navigation={navigation} />;
       case 'Settings':
         return <SettingsScreen navigation={navigation} />;
       case 'Groups':
         return <GroupsScreen navigation={navigation} />;
       default:
-        return <MainScreen navigation={navigation} />;
+        return null;
     }
   };
 
-  return <View style={{ flex: 1 }}>{renderScreen()}</View>;
+  const ALL_SCREENS: ScreenName[] = ['Home', 'Groups', 'RideSummary', 'Settings'];
+
+  return (
+    <View style={{ flex: 1 }}>
+      {ALL_SCREENS.filter((name) => visited.current.has(name)).map((name) => (
+        <View
+          key={name}
+          style={name === screen ? styles.screenActive : styles.screenHidden}
+          // Hidden screens shouldn't intercept touches.
+          pointerEvents={name === screen ? 'auto' : 'none'}
+        >
+          {screenFor(name)}
+        </View>
+      ))}
+    </View>
+  );
 };
+
+const styles = StyleSheet.create({
+  screenActive: { ...StyleSheet.absoluteFillObject },
+  screenHidden: { ...StyleSheet.absoluteFillObject, display: 'none' },
+});
 
 const App = () => (
   <SafeAreaProvider>

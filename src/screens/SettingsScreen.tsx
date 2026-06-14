@@ -4,6 +4,7 @@ import ScreenScaffold from '../components/ScreenScaffold';
 import { Card, GhostButton, ListRow, Muted, PrimaryButton, SectionLabel, TextField } from '../components/ui';
 import { accentFor, FONT } from '../components/bikerTheme';
 import { JOIN_ALERTS, playJoinAlert } from '../modules/notify/joinAlert';
+import { services } from '../modules/services';
 import type { AppNavigation } from '../app/App';
 import { useAppStore } from '../state/store';
 
@@ -103,6 +104,20 @@ export default function SettingsScreen({ navigation }: { navigation: AppNavigati
             );
           })}
         </View>
+        {__DEV__ ? (
+          <Pressable
+            onPress={() => {
+              // Play the in-helmet tone on the call stream the same way a real
+              // join does — but with no peer needed, to verify SCO routing.
+              const kind = joinAlert === 'off' ? 'short' : joinAlert;
+              services.bluetooth.playJoinTone?.(kind);
+              playJoinAlert(kind);
+            }}
+            style={styles.testTone}
+          >
+            <Text style={[styles.testToneText, { color: accent.base }]}>Test tone</Text>
+          </Pressable>
+        ) : null}
       </Card>
 
       <Card>
@@ -158,6 +173,8 @@ const styles = StyleSheet.create({
   segment: { flexDirection: 'row', gap: 8, marginTop: 14 },
   seg: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
   segText: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase' },
+  testTone: { marginTop: 14, alignSelf: 'flex-start', paddingVertical: 6 },
+  testToneText: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.6, textTransform: 'uppercase' },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, marginBottom: 6 },
   addField: { flex: 1, marginTop: 0 },
   addBtn: { paddingHorizontal: 6, paddingVertical: 8 },

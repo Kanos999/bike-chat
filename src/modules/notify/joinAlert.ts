@@ -1,14 +1,14 @@
 import { Vibration } from 'react-native';
 
 /**
- * Alert played when a new rider joins your channel mid-ride.
+ * Vibration companion for the rider-join alert.
  *
- * NOTE: React Native ships no audio playback and this project currently has no
- * sound library (offline install of `react-native-sound` is unavailable), so the
- * alert is delivered via the built-in Vibration API. To add an audible tone
- * later: `npm i react-native-sound`, drop short clips in
- * android/app/src/main/res/raw + the iOS bundle, and play the file matching
- * `kind` inside `playJoinAlert` (keep the vibration as a fallback).
+ * The audible chime (assets/chime.mp3 → android res/raw/chime.mp3) is played
+ * natively by BleModule.playJoinTone on the VOICE_COMMUNICATION usage so it rides
+ * the SCO link into the helmet. This Vibration buzz fires alongside it (and is the
+ * sole alert on platforms without the native chime, e.g. iOS until added). The
+ * `kind` chooses the buzz pattern; the chime itself is the same clip for every
+ * non-"off" style.
  */
 export type JoinAlert = 'off' | 'short' | 'double' | 'long';
 

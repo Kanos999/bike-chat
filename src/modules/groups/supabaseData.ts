@@ -28,6 +28,59 @@ export interface Block {
   created_at: string;
 }
 
+export interface Friend {
+  id: string;
+  username: string;
+}
+
+export interface FriendRequest {
+  id: string;
+  username: string;
+  direction: 'incoming' | 'outgoing';
+}
+
+/** Scalar columns of a persisted ride (no `summary` blob) — for the history list. */
+export interface RideRow {
+  id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string;
+  ride_mode: string;
+  group_id: string | null;
+  distance_km: number;
+  max_speed_kph: number;
+  avg_speed_kph: number;
+  max_lean_left_deg: number;
+  max_lean_right_deg: number;
+  time_moving_sec: number;
+  time_stopped_sec: number;
+  created_at: string;
+}
+
+/** A ride row including the full RideSummary blob — for the detail charts. */
+export interface RideWithSummary extends RideRow {
+  summary: unknown;
+}
+
+export interface RideInsert {
+  started_at: string;
+  ended_at: string;
+  ride_mode: string;
+  group_id: string | null;
+  distance_km: number;
+  max_speed_kph: number;
+  avg_speed_kph: number;
+  max_lean_left_deg: number;
+  max_lean_right_deg: number;
+  time_moving_sec: number;
+  time_stopped_sec: number;
+  summary: unknown;
+}
+
+const RIDE_SCALAR_COLUMNS =
+  'id,user_id,started_at,ended_at,ride_mode,group_id,distance_km,max_speed_kph,' +
+  'avg_speed_kph,max_lean_left_deg,max_lean_right_deg,time_moving_sec,time_stopped_sec,created_at';
+
 function supabaseAccessToken(): string | null {
   // The matcher's shared AUTH_TOKEN (config.authToken) is not a Supabase JWT, so
   // read the Supabase session token directly — it's the only thing PostgREST + RLS
@@ -149,4 +202,87 @@ export async function upsertProfile(id: string, username: string, phone?: string
     body: { id, username, phone: phone ?? null },
     prefer: 'resolution=merge-duplicates',
   });
+}
+
+/* ----- Friends ----- */
+
+export async function searchUsers(query: string): Promise<Friend[]> {
+  return rest<Friend[]>('/rpc/search_users', { method: 'POST', body: { p_query: query } });
+}
+
+export async function sendFriendRequest(username: string): Promise<void> {
+  await rest<void>('/rpc/send_friend_request', { method: 'POST', body: { p_username: username } });
+}
+
+export async function respondFriendRequest(requesterId: string, accept: boolean): Promise<void> {
+  await rest<void>('/rpc/respond_friend_request', {
+    method: 'POST',
+    body: { p_requester: requesterId, p_accept: accept },
+  });
+}
+
+export async function removeFriend(otherId: string): Promise<void> {
+  await rest<void>('/rpc/remove_friend', { method: 'POST', body: { p_other: otherId } });
+}
+
+export async function listFriends(): Promise<Friend[]> {
+  return rest<Friend[]>('/rpc/list_friends', { method: 'POST', body: {} });
+}
+
+export async function listFriendRequests(): Promise<FriendRequest[]> {
+  return rest<FriendRequest[]>('/rpc/list_friend_requests', { method: 'POST', body: {} });
+}
+
+/* ----- Crew membership by friend selection ----- */
+
+export async function addGroupMember(groupId: string, memberId: string): Promise<void> {
+  await rest<void>('/rpc/add_group_member', {
+    method: 'POST',
+    body: { p_group_id: groupId, p_member_id: memberId },
+  });
+}
+
+export async function removeGroupMember(groupId: string, memberId: string): Promise<void> {
+  await rest<void>('/rpc/remove_group_member', {
+    method: 'POST',
+    body: { p_group_id: groupId, p_member_id: memberId },
+  });
+}
+
+/* ----- Ride history ----- */
+
+export async function saveRide(payload: RideInsert): Promise<RideRow> {
+  const result = await rest<RideRow | RideRow[]>('/rides', {
+    method: 'POST',
+    body: payload,
+    prefer: 'return=representation',
+  });
+  return first(result);
+}
+
+export async function saveRideMatches(rideId: string, usernames: string[]): Promise<void> {
+  if (usernames.length === 0) return;
+  await rest<void>('/ride_matches', {
+    method: 'POST',
+    body: usernames.map((matched_username) => ({ ride_id: rideId, matched_username })),
+    prefer: 'resolution=ignore-duplicates',
+  });
+}
+
+export async function listRides(): Promise<RideRow[]> {
+  return rest<RideRow[]>(`/rides?select=${RIDE_SCALAR_COLUMNS}&order=started_at.desc`);
+}
+
+export async function getRide(rideId: string): Promise<RideWithSummary | null> {
+  const rows = await rest<RideWithSummary[]>(
+    `/rides?id=eq.${encodeURIComponent(rideId)}&select=${RIDE_SCALAR_COLUMNS},summary&limit=1`,
+  );
+  return rows[0] ?? null;
+}
+
+export async function getRideMatches(rideId: string): Promise<string[]> {
+  const rows = await rest<{ matched_username: string }[]>(
+    `/ride_matches?ride_id=eq.${encodeURIComponent(rideId)}&select=matched_username`,
+  );
+  return rows.map((r) => r.matched_username);
 }

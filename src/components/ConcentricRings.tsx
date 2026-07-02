@@ -26,6 +26,8 @@ function ConcentricRings({ centreX, centreY }: Props) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {Array.from({ length: RING_COUNT }).map((_, i) => {
+        // Drop the innermost ring; every other ring keeps its exact radius/opacity.
+        if (i === 0) return null;
         const radius = (i + 1) * RING_SPACING;
         const diam = radius * 2;
         const opacity = BASE_OPACITY * Math.pow(DECAY, i);

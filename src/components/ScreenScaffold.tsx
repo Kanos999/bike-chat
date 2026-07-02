@@ -8,9 +8,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import BottomNav, { NavTabLabel } from './BottomNav';
+import type { NavTabLabel } from './BottomNav';
 import ConcentricRings from './ConcentricRings';
-import { Accent, accentFor, COLORS, FONT } from './bikerTheme';
+import { Accent, COLORS, FONT } from './bikerTheme';
 import type { AppNavigation } from '../app/App';
 
 interface Props {
@@ -36,10 +36,7 @@ interface Props {
  */
 export default function ScreenScaffold({
   title,
-  navigation,
-  activeTab,
   headerRight,
-  accent = accentFor('open'),
   rings = false,
   scroll = true,
   children,
@@ -58,7 +55,7 @@ export default function ScreenScaffold({
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
       {rings ? <ConcentricRings centreX={centre.x} centreY={centre.y} /> : null}
 
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={[styles.header, { paddingTop: insets.top > 0 ? 14 : 46 }]}>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {title}
@@ -81,8 +78,6 @@ export default function ScreenScaffold({
             {children}
           </View>
         )}
-
-        <BottomNav active={activeTab} navigation={navigation} accent={accent} />
       </SafeAreaView>
     </View>
   );

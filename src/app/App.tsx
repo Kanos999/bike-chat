@@ -1,71 +1,57 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { ActivityIndicator, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MainScreen from '../screens/MainScreen';
 import RideSummaryScreen from '../screens/RideSummaryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import LoginScreen from '../screens/LoginScreen';
+import UsernameSetupScreen from '../screens/UsernameSetupScreen';
+import BottomNav from '../components/BottomNav';
+import { COLORS } from '../components/bikerTheme';
 import { config } from '../config';
 import { services } from '../modules/services';
 import { loadProfile } from '../state/profileStorage';
 import { useAppStore } from '../state/store';
 
-export type ScreenName = 'Home' | 'Ride' | 'RideSummary' | 'Settings' | 'Groups';
-
-export type RootStackParamList = {
+/**
+ * Bottom-tab routes. Screens call `navigation.navigate('Settings')` etc. to jump
+ * tabs; react-navigation runs the switch on the native thread (react-native-screens),
+ * so it stays snappy even while the JS thread is busy, and only the focused tab is
+ * rendered (lazy) instead of every screen staying mounted.
+ */
+export type RootTabParamList = {
   Home: undefined;
-  Ride: undefined;
-  RideSummary: { summaryId?: string };
-  Settings: undefined;
   Groups: undefined;
+  RideSummary: { summaryId?: string } | undefined;
+  Settings: undefined;
 };
 
-export type AppNavigation = {
-  navigate: <T extends ScreenName>(
-    screen: T,
-    params?: RootStackParamList[T] extends undefined ? undefined : RootStackParamList[T],
-  ) => void;
-  replace: <T extends ScreenName>(
-    screen: T,
-    params?: RootStackParamList[T] extends undefined ? undefined : RootStackParamList[T],
-  ) => void;
-  goBack: () => void;
+export type ScreenName = keyof RootTabParamList;
+
+// Minimal navigation shape the screens rely on. react-navigation's navigation
+// object satisfies it (it exposes `.navigate`); only `navigate` is used app-wide.
+export type AppNavigation = { navigate: (screen: ScreenName, params?: object) => void };
+
+const Tab = createBottomTabNavigator<RootTabParamList>();
+
+// Match the app's black background so route changes never flash a white frame.
+const navTheme: Theme = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: COLORS.bg, card: COLORS.bg },
 };
 
 const AppInner = () => {
-  const [screen, setScreen] = useState<ScreenName>('Home');
-  const [params, setParams] = useState<RootStackParamList[ScreenName]>(undefined);
-  const [history, setHistory] = useState<ScreenName[]>(['Home']);
-  const authReady = useAppStore((state) => state.authReady);
-  const session = useAppStore((state) => state.session);
-  const initializeAuth = useAppStore((state) => state.initializeAuth);
-
-  const navigation: AppNavigation = React.useMemo(
-    () => ({
-      navigate: (name, p) => {
-        setParams(p ?? undefined);
-        setScreen(name);
-        setHistory((h) => [...h, name]);
-      },
-      replace: (name, p) => {
-        setParams(p ?? undefined);
-        setScreen(name);
-        setHistory((h) => [...h.slice(0, -1), name]);
-      },
-      goBack: () => {
-        setHistory((h) => {
-          if (h.length <= 1) return h;
-          const next = h.slice(0, -1);
-          setScreen(next[next.length - 1]);
-          setParams(undefined);
-          return next;
-        });
-      },
-    }),
-    [],
-  );
+  const authReady = useAppStore((s) => s.authReady);
+  const session = useAppStore((s) => s.session);
+  const username = useAppStore((s) => s.username);
+  const initializeAuth = useAppStore((s) => s.initializeAuth);
+  // Gate on the persisted profile having loaded so we don't flash the callsign
+  // setup screen at existing users before hydrateProfile fills in their username.
+  const [profileReady, setProfileReady] = useState(false);
 
   useEffect(() => {
     config.riderIdGetter = () => useAppStore.getState().riderId;
@@ -79,6 +65,7 @@ const AppInner = () => {
     loadProfile().then((profile) => {
       useAppStore.getState().hydrateProfile(profile);
       useAppStore.getState().hydrateGroupPrefs(profile);
+      setProfileReady(true);
     });
   }, []);
 
@@ -97,17 +84,9 @@ const AppInner = () => {
     });
   }, []);
 
-  // Keep visited screens mounted and toggle visibility, so tab switches are a style
-  // flip instead of an unmount/remount. Avoids re-paying each screen's mount cost
-  // (MainScreen's animated nodes + ring measure, GroupsScreen's loadGroups fetch).
-  // Screens are mounted lazily on first visit so we don't pay for unopened tabs.
-  // NOTE: must stay above the early returns below — hooks can't run conditionally.
-  const visited = React.useRef<Set<ScreenName>>(new Set([screen]));
-  visited.current.add(screen);
-
   if (!authReady) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg }}>
         <ActivityIndicator />
       </View>
     );
@@ -117,59 +96,35 @@ const AppInner = () => {
     return <LoginScreen />;
   }
 
-  const screenFor = (name: ScreenName): React.ReactNode => {
-    switch (name) {
-      case 'Home':
-        return <MainScreen navigation={navigation} />;
-      case 'RideSummary':
-        return <RideSummaryScreen navigation={navigation} />;
-      case 'Settings':
-        return <SettingsScreen navigation={navigation} />;
-      case 'Groups':
-        return <GroupsScreen navigation={navigation} />;
-      default:
-        return null;
-    }
-  };
-
-  const ALL_SCREENS: ScreenName[] = ['Home', 'Groups', 'RideSummary', 'Settings'];
+  // Authenticated but no callsign yet (riderId is derived from it): force setup,
+  // otherwise Start Ride silently blocks on a missing riderId. Wait for the
+  // persisted profile to load first so returning users skip straight through.
+  if (profileReady && !username.trim()) {
+    return <UsernameSetupScreen />;
+  }
 
   return (
-    <View style={{ flex: 1 }}>
-      {ALL_SCREENS.filter((name) => visited.current.has(name)).map((name) => (
-        <ScreenLayer key={name} active={name === screen}>
-          {screenFor(name)}
-        </ScreenLayer>
-      ))}
-    </View>
+    <NavigationContainer theme={navTheme}>
+      <Tab.Navigator
+        backBehavior="history"
+        screenOptions={{ headerShown: false, lazy: true }}
+        tabBar={(props) => <BottomNav {...props} />}
+      >
+        <Tab.Screen name="Home" component={MainScreen} />
+        <Tab.Screen name="Groups" component={GroupsScreen} />
+        <Tab.Screen name="RideSummary" component={RideSummaryScreen} />
+        <Tab.Screen name="Settings" component={SettingsScreen} />
+      </Tab.Navigator>
+    </NavigationContainer>
   );
 };
 
-/**
- * Stacked screen that crossfades in when it becomes active, so tab switches are a
- * smooth fade rather than an instant cut. Inactive layers sit at opacity 0 beneath
- * (kept mounted for perf) and don't intercept touches.
- */
-function ScreenLayer({ active, children }: { active: boolean; children: React.ReactNode }) {
-  const opacity = useSharedValue(active ? 1 : 0);
-  useEffect(() => {
-    opacity.value = withTiming(active ? 1 : 0, { duration: 200 });
-  }, [active, opacity]);
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  return (
-    <Animated.View
-      style={[StyleSheet.absoluteFillObject, { zIndex: active ? 1 : 0 }, style]}
-      pointerEvents={active ? 'auto' : 'none'}
-    >
-      {children}
-    </Animated.View>
-  );
-}
-
 const App = () => (
-  <SafeAreaProvider>
-    <AppInner />
-  </SafeAreaProvider>
+  <GestureHandlerRootView style={{ flex: 1 }}>
+    <SafeAreaProvider>
+      <AppInner />
+    </SafeAreaProvider>
+  </GestureHandlerRootView>
 );
 
 export default App;

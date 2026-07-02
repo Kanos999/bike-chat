@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import './src/app/polyfills';
 import './src/app/bootstrap';
 import './global.css';

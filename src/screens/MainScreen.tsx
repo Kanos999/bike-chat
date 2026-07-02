@@ -22,11 +22,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Path, Rect } from 'react-native-svg';
-import BottomNav from '../components/BottomNav';
 import ConcentricRings from '../components/ConcentricRings';
 import RiderDot, { Rider } from '../components/RiderDot';
 import { accentFor, COLORS, FONT, HELMET_PATH, Mode } from '../components/bikerTheme';
-import type { AppNavigation } from '../app/App';
 import { services } from '../modules/services';
 import { useAppStore } from '../state/store';
 
@@ -47,7 +45,7 @@ function angleFor(riderId: string): number {
   return h % 360;
 }
 
-export default function MainScreen({ navigation }: { navigation: AppNavigation }) {
+export default function MainScreen() {
   const insets = useSafeAreaInsets();
 
   // --- Live ride state from the store ---
@@ -157,7 +155,7 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
 
       <ConcentricRings centreX={centre.x} centreY={centre.y} />
 
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top > 0 ? 14 : 46 }]}>
           <Text style={styles.headerTitle}>
@@ -268,9 +266,6 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
             onPress={onRideButton}
           />
         </View>
-
-        {/* Bottom nav */}
-        <BottomNav active="Comms" navigation={navigation} accent={accent} />
       </SafeAreaView>
     </View>
   );
@@ -613,7 +608,7 @@ const styles = StyleSheet.create({
   rideButton: {
     width: '100%',
     height: 64,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1.5,
     backgroundColor: 'rgba(255,255,255,0.03)',
     flexDirection: 'row',
@@ -623,6 +618,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowOffset: { width: 0, height: 0 },
   },
-  rideGradientWrap: { borderRadius: 14, overflow: 'hidden' },
+  rideGradientWrap: { borderRadius: 8, overflow: 'hidden' },
   rideText: { fontFamily: FONT, fontSize: 17, letterSpacing: 2.4, textTransform: 'uppercase' },
 });

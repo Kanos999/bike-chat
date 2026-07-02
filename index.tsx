@@ -1,3 +1,4 @@
+import './src/app/polyfills';
 import './src/app/bootstrap';
 import './global.css';
 import { AppRegistry } from 'react-native';

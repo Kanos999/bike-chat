@@ -4,6 +4,7 @@ import type { Location } from '../modules/location/types';
 import type { NearbyChannelResponse } from '../modules/api/types';
 import { config } from '../config';
 import { services } from '../modules/services';
+import { rideForegroundService } from '../modules/rideService';
 import { RideMode, RidePreference, RideSessionHandles } from './types';
 import { AnalyticsSlice } from './analyticsSlice';
 import { ProximitySlice } from './proximitySlice';
@@ -171,6 +172,13 @@ export const createRideSlice: StateCreator<
     }
 
     logRide('startRide.permissions.granted', { riderId });
+
+    // Keep the process (GPS, BLE, presence WS, WebRTC audio) alive in the
+    // background for the duration of the ride. Started now that location
+    // permission is held so the service can claim the location FGS type; it is
+    // refreshed after the voice join to additionally claim the microphone type.
+    await rideForegroundService.start();
+    logRide('rideService.started');
 
     const startedAt = Date.now();
 
@@ -465,6 +473,10 @@ export const createRideSlice: StateCreator<
                 return;
               }
               logRide('voice.joinChannel.ok', { channelId: response.channelId });
+              // The join just acquired RECORD_AUDIO; refresh the foreground service
+              // so it adds the microphone type and audio keeps flowing with the
+              // screen off. Best-effort and non-blocking.
+              void rideForegroundService.refresh();
               set({ statusMessage: `Connected to ${response.members.length + 1} rider channel` });
             } catch (e) {
               if (!isRideSessionCurrent(sessionId)) return;
@@ -571,6 +583,7 @@ export const createRideSlice: StateCreator<
         message: error instanceof Error ? error.message : String(error),
       });
       await cleanupRideHandles(handles);
+      await rideForegroundService.stop();
       if (isRideSessionCurrent(sessionId)) {
         await services.bluetooth.stopVoiceRoute();
         await services.voice.leaveChannel();
@@ -588,6 +601,7 @@ export const createRideSlice: StateCreator<
     if (!isRideSessionCurrent(sessionId)) {
       logRide('startRide.aborted.beforeActivate', { riderId });
       await cleanupRideHandles(handles);
+      await rideForegroundService.stop();
       await services.bluetooth.stopVoiceRoute();
       await services.voice.leaveChannel();
       get().setRecording(false);
@@ -628,6 +642,7 @@ export const createRideSlice: StateCreator<
     });
 
     await cleanupRideHandles(handles);
+    await rideForegroundService.stop();
     await services.bluetooth.stopVoiceRoute();
     if (riderId && last) {
       const [lat, lon] = last.split(',').map((val) => parseFloat(val.trim()));

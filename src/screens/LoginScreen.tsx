@@ -1,9 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   LayoutChangeEvent,
-  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -11,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
@@ -20,19 +19,43 @@ import { useAppStore } from '../state/store';
 
 const accent = accentFor('open');
 
+// Auth is fixed to Australian numbers. The user enters their national number
+// (e.g. 0400 111 222) and we build the E.164 form (+61 400 111 222) for Supabase —
+// the leading trunk "0" is dropped, per E.164.
+const AU_DIAL_CODE = '+61';
+const nationalDigits = (local: string): string => {
+  let d = local.replace(/\D/g, '').replace(/^0+/, '');
+  // Guard against a user who typed the country code too (e.g. +61 / 0061), which
+  // would otherwise double up to +6161…. AU national numbers never start with 61.
+  if (d.startsWith('61') && d.length > 9) d = d.slice(2);
+  return d;
+};
+const toE164AU = (local: string): string => `${AU_DIAL_CODE}${nationalDigits(local)}`;
+
 const LoginScreen = () => {
   const authLoading = useAppStore((state) => state.authLoading);
   const authError = useAppStore((state) => state.authError);
   const requestPhoneOtp = useAppStore((state) => state.requestPhoneOtp);
   const verifyPhoneOtp = useAppStore((state) => state.verifyPhoneOtp);
 
+  // Smoothly lift the centred form as the keyboard animates in, instead of the hard
+  // re-centre the OS resize produces. Driven by the live keyboard height.
+  const keyboard = useAnimatedKeyboard();
+  const keyboardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -keyboard.height.value * 0.5 }],
+  }));
+
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const canRequestOtp = useMemo(() => phone.trim().length >= 8, [phone]);
-  const canVerifyOtp = useMemo(() => phone.trim().length >= 8 && code.trim().length >= 4, [phone, code]);
+  // AU mobiles have 9 significant digits (4xx xxx xxx) once the trunk 0 is dropped.
+  const canRequestOtp = useMemo(() => nationalDigits(phone).length >= 9, [phone]);
+  const canVerifyOtp = useMemo(
+    () => nationalDigits(phone).length >= 9 && code.trim().length >= 4,
+    [phone, code]
+  );
   const enabled = step === 'phone' ? canRequestOtp : canVerifyOtp;
 
   // Centre the full-bleed ring backdrop on the hero helmet bubble.
@@ -47,11 +70,11 @@ const LoginScreen = () => {
   const onRequestCode = async () => {
     setLocalError(null);
     if (!canRequestOtp) {
-      setLocalError('Enter a valid phone number (ideally in E.164, e.g. +61400111222).');
+      setLocalError('Enter a valid Australian mobile number, e.g. 0400 111 222.');
       return;
     }
     try {
-      await requestPhoneOtp(phone.trim());
+      await requestPhoneOtp(toE164AU(phone));
       setStep('code');
     } catch {
       // handled by authError
@@ -65,7 +88,7 @@ const LoginScreen = () => {
       return;
     }
     try {
-      await verifyPhoneOtp(phone.trim(), code.trim());
+      await verifyPhoneOtp(toE164AU(phone), code.trim());
     } catch {
       // handled by authError
     }
@@ -77,10 +100,7 @@ const LoginScreen = () => {
       <ConcentricRings centreX={centre.x} centreY={centre.y} />
 
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <Animated.View style={[styles.flex, keyboardStyle]}>
           <View style={styles.content}>
             {/* Hero */}
             <View style={styles.hero}>
@@ -95,17 +115,22 @@ const LoginScreen = () => {
 
             {/* Form card */}
             <View style={styles.card}>
-              <Text style={styles.label}>Phone</Text>
-              <TextInput
-                style={styles.input}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+61400111222"
-                placeholderTextColor="rgba(255,255,255,0.22)"
-                autoCapitalize="none"
-                keyboardType="phone-pad"
-                editable={!authLoading && step === 'phone'}
-              />
+              <Text style={styles.label}>Mobile</Text>
+              <View style={styles.phoneRow}>
+                <View style={styles.ccBox}>
+                  <Text style={styles.ccText}>+61</Text>
+                </View>
+                <TextInput
+                  style={[styles.input, styles.phoneInput]}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="0400 111 222"
+                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  autoCapitalize="none"
+                  keyboardType="phone-pad"
+                  editable={!authLoading && step === 'phone'}
+                />
+              </View>
 
               {step === 'code' ? (
                 <>
@@ -179,7 +204,7 @@ const LoginScreen = () => {
               </Pressable>
             ) : null}
           </View>
-        </KeyboardAvoidingView>
+        </Animated.View>
       </SafeAreaView>
     </View>
   );
@@ -252,6 +277,23 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: '#fff',
   },
+  phoneRow: { flexDirection: 'row', alignItems: 'stretch' },
+  ccBox: {
+    backgroundColor: COLORS.innerA,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  ccText: {
+    fontFamily: FONT,
+    fontSize: 18,
+    letterSpacing: 1,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  phoneInput: { flex: 1 },
   error: {
     marginTop: 12,
     fontFamily: FONT,

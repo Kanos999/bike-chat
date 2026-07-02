@@ -6,7 +6,10 @@ buildscript {
         targetSdkVersion = 34
         // Use an NDK version that has source.properties (e.g. install via Android Studio SDK Manager)
         ndkVersion = "26.1.10909125"
-        kotlinVersion = "1.8.0"
+        // LiveKit's native module (@livekit/react-native) requires Kotlin 1.9.25.
+        // The 1.9.25 plugin also redirects the (no-longer-published) kotlin-stdlib-common
+        // to kotlin-stdlib, avoiding a fallthrough to the sunset OSSRH snapshots repo.
+        kotlinVersion = "1.9.25"
     }
     repositories {
         google()

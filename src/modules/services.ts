@@ -11,7 +11,7 @@ import { createMockLocationModule } from './location/mockLocation';
 import { createRealLocationModule } from './location/realLocation';
 import { LocationModule } from './location/types';
 import { createMockVoiceModule } from './voice/mockVoiceModule';
-import { createWebRTCVoiceModule } from './voice/webrtcVoiceModule';
+import { createLiveKitVoiceModule } from './voice/livekitVoiceModule';
 import { VoiceModule } from './voice/types';
 
 export interface Services {
@@ -46,7 +46,7 @@ const realBle = getRealBluetoothModule();
 const bluetooth: BluetoothModule = realBle ?? createMockBluetoothModule();
 const location = useRealLocation ? createRealLocationModule() : createMockLocationModule();
 const imu: IMUModule = realIMU ?? createMockIMUModule();
-const voice: VoiceModule = useRealVoice ? createWebRTCVoiceModule() : createMockVoiceModule();
+const voice: VoiceModule = useRealVoice ? createLiveKitVoiceModule() : createMockVoiceModule();
 const apiClient: ApiClient = useRealApi ? createRealApiClient() : createMockApiClient();
 
 if (typeof __DEV__ !== 'undefined' && __DEV__) {

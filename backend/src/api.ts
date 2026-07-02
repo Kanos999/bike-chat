@@ -12,6 +12,8 @@ import {
 import { startSignallingServer } from './signalling';
 import { startPresenceSubscribeServer } from './presenceSubscribe';
 import { createAuthContextFromEnv } from './auth';
+import { createTurnConfigFromEnv } from './turn';
+import { createLiveKitConfigFromEnv } from './livekit';
 
 const app = express();
 app.use(cors());
@@ -25,6 +27,8 @@ app.get('/dev', (_req, res) => {
 const logRequests = !['0', 'false', 'no', 'off'].includes(String(process.env.REQUEST_LOGS ?? '').toLowerCase());
 
 const auth = createAuthContextFromEnv();
+const turn = createTurnConfigFromEnv();
+const livekit = createLiveKitConfigFromEnv();
 
 async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   const ok = await auth.authorizeHttp(req);
@@ -44,7 +48,38 @@ app.get('/readyz', (_req, res) => {
     ok: true,
     snapshot: process.env.PRESENCE_SNAPSHOT_PATH ?? null,
     authMode: auth.mode,
+    turn: turn.enabled ? 'enabled' : 'stun-only',
+    voice: livekit.enabled ? 'livekit' : 'disabled',
   });
+});
+
+// Mint a LiveKit join token for the rider's currently-assigned channel (room).
+// Authed so only signed-in riders get media access. Returns 503 until LiveKit is
+// configured, so deploying this is safe ahead of the client cut-over.
+app.get('/voice-token', authMiddleware, async (req, res) => {
+  if (!livekit.enabled) {
+    return res.status(503).json({ error: 'Voice not configured' });
+  }
+  const channelId = typeof req.query.channelId === 'string' ? req.query.channelId : '';
+  const riderId = typeof req.query.riderId === 'string' ? req.query.riderId : '';
+  if (!channelId || !riderId) {
+    return res.status(400).json({ error: 'channelId and riderId required' });
+  }
+  try {
+    const result = await livekit.generate(channelId, riderId);
+    res.json(result);
+  } catch (e) {
+    if (logRequests) console.error('[http] /voice-token mint failed', e);
+    res.status(500).json({ error: 'Failed to mint voice token' });
+  }
+});
+
+// Ephemeral ICE server list (STUN always; TURN relay when configured). Authed so
+// relay credentials are only handed to signed-in riders. Safe when TURN is not
+// configured — clients simply fall back to STUN-only, as before.
+app.get('/turn-credentials', authMiddleware, (req, res) => {
+  const identifier = typeof req.query.riderId === 'string' ? req.query.riderId : 'bikechat';
+  res.json(turn.generate(identifier));
 });
 
 app.post('/presence', authMiddleware, async (req, res) => {

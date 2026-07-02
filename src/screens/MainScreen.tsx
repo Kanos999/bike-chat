@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutChangeEvent,
+  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -30,6 +31,8 @@ import { services } from '../modules/services';
 import { useAppStore } from '../state/store';
 
 const WAVE_BARS = [5, 9, 14, 10, 7, 12, 6, 9, 5];
+const IS_IOS = Platform.OS === 'ios';
+const SEG_COLORS: Record<Mode, string> = { open: '#FF5500', group: '#FFAA00' };
 
 function formatDist(m: number): string {
   if (!m || m <= 0) return 'linked';
@@ -181,31 +184,7 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
         </View>
 
         {/* Mode toggle (locked while riding) */}
-        <View style={styles.toggleWrap}>
-          <View style={styles.toggle}>
-            {(['open', 'group'] as Mode[]).map((m) => {
-              const active = mode === m;
-              const segAccent = m === 'open' ? '#FF5500' : '#FFAA00';
-              return (
-                <Pressable
-                  key={m}
-                  onPress={() => !isRiding && setSelectedPref(m)}
-                  disabled={isRiding}
-                  style={[
-                    styles.toggleSeg,
-                    { backgroundColor: active ? segAccent : 'transparent', opacity: isRiding && !active ? 0.4 : 1 },
-                  ]}
-                >
-                  <Text
-                    style={[styles.toggleText, { color: active ? '#000' : 'rgba(255,255,255,0.28)' }]}
-                  >
-                    {m}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+        <ModeToggle mode={mode} disabled={isRiding} onSelect={setSelectedPref} />
 
         {/* Radar area */}
         <View style={styles.radarArea}>
@@ -294,6 +273,80 @@ export default function MainScreen({ navigation }: { navigation: AppNavigation }
         <BottomNav active="Comms" navigation={navigation} accent={accent} />
       </SafeAreaView>
     </View>
+  );
+}
+
+/* ----- Mode toggle (animated sliding indicator) ----- */
+function ModeToggle({
+  mode,
+  disabled,
+  onSelect,
+}: {
+  mode: Mode;
+  disabled: boolean;
+  onSelect: (m: Mode) => void;
+}) {
+  const [width, setWidth] = useState(0);
+  const seg = useSharedValue(mode === 'group' ? 1 : 0);
+  useEffect(() => {
+    seg.value = withTiming(mode === 'group' ? 1 : 0, { duration: 220 });
+  }, [mode, seg]);
+
+  const PAD = 3;
+  const GAP = 3;
+  const segW = width > 0 ? (width - PAD * 2 - GAP) / 2 : 0;
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: seg.value * (segW + GAP) }],
+    backgroundColor: interpolateColor(seg.value, [0, 1], [SEG_COLORS.open, SEG_COLORS.group]),
+  }));
+
+  return (
+    <View style={styles.toggleWrap}>
+      <View
+        style={[styles.toggle, { opacity: disabled ? 0.6 : 1 }]}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      >
+        {segW > 0 ? (
+          <Animated.View style={[styles.toggleIndicator, { width: segW }, indicatorStyle]} />
+        ) : null}
+        {(['open', 'group'] as Mode[]).map((m, i) => (
+          <ToggleLabel
+            key={m}
+            label={m}
+            index={i}
+            seg={seg}
+            disabled={disabled}
+            onPress={() => onSelect(m)}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ToggleLabel({
+  label,
+  index,
+  seg,
+  disabled,
+  onPress,
+}: {
+  label: Mode;
+  index: number;
+  seg: SharedValue<number>;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  // t = 0 when this segment is active (under the indicator), 1 when inactive.
+  const textStyle = useAnimatedStyle(() => {
+    const t = index === 0 ? seg.value : 1 - seg.value;
+    return { color: interpolateColor(t, [0, 1], ['#000', 'rgba(255,255,255,0.28)']) };
+  });
+  return (
+    <Pressable onPress={onPress} disabled={disabled} style={styles.toggleSeg}>
+      <Animated.Text style={[styles.toggleText, textStyle]}>{label}</Animated.Text>
+    </Pressable>
   );
 }
 
@@ -403,10 +456,13 @@ function RideButton({
 
   const shellStyle = useAnimatedStyle(() => ({
     borderColor: interpolateColor(p.value, [0, 1], ['rgba(255,255,255,0.09)', accent.base]),
+    // Glow via shadow* is iOS-only. On Android `elevation` would render a hard black
+    // rectangle behind this translucent button (the orange shadowColor is ignored),
+    // which showed up as the dark box intersecting the button — so no elevation here.
+    // The active state on Android reads from the animated border + gradient fill.
     shadowColor: accent.base,
-    shadowOpacity: interpolate(p.value, [0, 1], [0, 0.5]),
-    shadowRadius: interpolate(p.value, [0, 1], [0, 32]),
-    elevation: interpolate(p.value, [0, 1], [0, 8]),
+    shadowOpacity: IS_IOS ? interpolate(p.value, [0, 1], [0, 0.5]) : 0,
+    shadowRadius: IS_IOS ? interpolate(p.value, [0, 1], [0, 32]) : 0,
   }));
   const gradientStyle = useAnimatedStyle(() => ({ opacity: p.value }));
 
@@ -479,7 +535,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)',
   },
-  toggleSeg: { flex: 1, paddingVertical: 9, borderRadius: 7, alignItems: 'center' },
+  toggleSeg: { flex: 1, paddingVertical: 9, borderRadius: 7, alignItems: 'center', zIndex: 1 },
+  toggleIndicator: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 7 },
   toggleText: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.8, textTransform: 'uppercase' },
 
   radarArea: { flex: 1, paddingHorizontal: 24, alignItems: 'center' },

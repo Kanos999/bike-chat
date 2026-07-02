@@ -58,6 +58,16 @@ configurations.all {
     resolutionStrategy {
         force 'androidx.core:core-ktx:1.12.0'
         force 'androidx.core:core:1.12.0'
+        // kotlin-stdlib-common is no longer published (Kotlin >= 1.9.20). Transitive
+        // deps (okio, flipper's kotlinx-*) still request it and conflict-resolve to
+        // 1.9.25, which doesn't exist anywhere — redirect it to kotlin-stdlib so the
+        // build doesn't fall through to the sunset OSSRH snapshots repo (504).
+        eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin'
+                    && details.requested.name == 'kotlin-stdlib-common') {
+                details.useTarget "org.jetbrains.kotlin:kotlin-stdlib:${details.requested.version}"
+            }
+        }
     }
 }
 

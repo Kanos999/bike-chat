@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MainScreen from '../screens/MainScreen';
 import RideSummaryScreen from '../screens/RideSummaryScreen';
@@ -136,23 +137,34 @@ const AppInner = () => {
   return (
     <View style={{ flex: 1 }}>
       {ALL_SCREENS.filter((name) => visited.current.has(name)).map((name) => (
-        <View
-          key={name}
-          style={name === screen ? styles.screenActive : styles.screenHidden}
-          // Hidden screens shouldn't intercept touches.
-          pointerEvents={name === screen ? 'auto' : 'none'}
-        >
+        <ScreenLayer key={name} active={name === screen}>
           {screenFor(name)}
-        </View>
+        </ScreenLayer>
       ))}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  screenActive: { ...StyleSheet.absoluteFillObject },
-  screenHidden: { ...StyleSheet.absoluteFillObject, display: 'none' },
-});
+/**
+ * Stacked screen that crossfades in when it becomes active, so tab switches are a
+ * smooth fade rather than an instant cut. Inactive layers sit at opacity 0 beneath
+ * (kept mounted for perf) and don't intercept touches.
+ */
+function ScreenLayer({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const opacity = useSharedValue(active ? 1 : 0);
+  useEffect(() => {
+    opacity.value = withTiming(active ? 1 : 0, { duration: 200 });
+  }, [active, opacity]);
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View
+      style={[StyleSheet.absoluteFillObject, { zIndex: active ? 1 : 0 }, style]}
+      pointerEvents={active ? 'auto' : 'none'}
+    >
+      {children}
+    </Animated.View>
+  );
+}
 
 const App = () => (
   <SafeAreaProvider>

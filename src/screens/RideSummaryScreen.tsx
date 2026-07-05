@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, BackHandler, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import ScreenScaffold from '../components/ScreenScaffold';
-import { Card, Muted, PrimaryButton, SectionLabel } from '../components/ui';
+import { Card, GhostButton, Muted, SectionLabel } from '../components/ui';
 import { accentFor, FONT } from '../components/bikerTheme';
 import type { AppNavigation } from '../app/App';
 import { getRide, type RideRow } from '../modules/groups/supabaseData';
@@ -28,6 +29,17 @@ function formatRideDate(iso: string): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
     ' · ' +
     d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+// Seconds → "1h 05m", "23m 40s", or "40s" — much clearer than a raw "1420 s".
+function formatDuration(totalSec: number): string {
+  const s = Math.max(0, Math.round(totalSec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  if (m > 0) return `${m}m ${String(sec).padStart(2, '0')}s`;
+  return `${sec}s`;
 }
 
 function BarChart({ data, title, suffix, color }: { data: number[]; title: string; suffix: string; color: string }) {
@@ -83,6 +95,20 @@ export default function RideSummaryScreen({ navigation }: { navigation: AppNavig
     void loadRides();
   }, [loadRides]);
 
+  // While a ride detail is open, the Android hardware back button closes it (back
+  // to the history list) instead of leaving the Routes tab. Only active when this
+  // tab is focused and a detail is showing.
+  useFocusEffect(
+    useCallback(() => {
+      if (!selectedId) return undefined;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        setSelectedId(null);
+        return true;
+      });
+      return () => sub.remove();
+    }, [selectedId]),
+  );
+
   const selected = selectedId ? rides.find((r) => r.id === selectedId) ?? null : null;
 
   if (selected) {
@@ -90,7 +116,14 @@ export default function RideSummaryScreen({ navigation }: { navigation: AppNavig
   }
 
   return (
-    <ScreenScaffold title="Routes" navigation={navigation} activeTab="Routes" accent={accent}>
+    <ScreenScaffold
+      title="Routes"
+      navigation={navigation}
+      activeTab="Routes"
+      accent={accent}
+      refreshing={ridesLoading}
+      onRefresh={() => void loadRides()}
+    >
       <SectionLabel>Ride history</SectionLabel>
       {rides.length === 0 ? (
         <Card>
@@ -132,6 +165,21 @@ function RideDetail({
   const friendRequests = useAppStore((s) => s.friendRequests);
   const username = useAppStore((s) => s.username);
   const sendFriendRequest = useAppStore((s) => s.sendFriendRequest);
+  const deleteRide = useAppStore((s) => s.deleteRide);
+
+  const onDelete = () => {
+    Alert.alert('Delete ride', 'Remove this ride from your history? This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await deleteRide(ride.id);
+          if (!error) onBack();
+        },
+      },
+    ]);
+  };
 
   const [summary, setSummary] = useState<RideSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
@@ -175,11 +223,7 @@ function RideDetail({
       navigation={navigation}
       activeTab="Routes"
       accent={accent}
-      headerRight={
-        <Pressable onPress={onBack}>
-          <Text style={[styles.backLink, { color: accent.base }]}>Back</Text>
-        </Pressable>
-      }
+      onBack={onBack}
     >
       <Card>
         <SectionLabel>{formatRideDate(ride.started_at)}</SectionLabel>
@@ -190,8 +234,8 @@ function RideDetail({
           <StatRow label="Max lean L" value={`${ride.max_lean_left_deg.toFixed(1)}°`} />
           <StatRow label="Max lean R" value={`${ride.max_lean_right_deg.toFixed(1)}°`} />
           <StatRow label="Distance" value={`${ride.distance_km.toFixed(2)} km`} />
-          <StatRow label="Time moving" value={`${ride.time_moving_sec.toFixed(0)} s`} />
-          <StatRow label="Time stopped" value={`${ride.time_stopped_sec.toFixed(0)} s`} />
+          <StatRow label="Time moving" value={formatDuration(ride.time_moving_sec)} />
+          <StatRow label="Time stopped" value={formatDuration(ride.time_stopped_sec)} />
         </View>
       </Card>
 
@@ -230,7 +274,7 @@ function RideDetail({
         )}
       </Card>
 
-      <PrimaryButton label="Back to history" accent={accent} onPress={onBack} />
+      <GhostButton label="Delete ride" danger onPress={onDelete} />
     </ScreenScaffold>
   );
 }
@@ -239,10 +283,8 @@ const styles = StyleSheet.create({
   flexShrink: { flexShrink: 1 },
   rideRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rideDate: { fontFamily: FONT, fontSize: 16, letterSpacing: 0.8, color: '#fff', textTransform: 'uppercase' },
-  rideSub: { marginTop: 3, fontFamily: FONT, fontSize: 11, letterSpacing: 1, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' },
+  rideSub: { marginTop: 3, fontFamily: FONT, fontSize: 12, letterSpacing: 1, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' },
   chevron: { fontSize: 26, lineHeight: 26 },
-
-  backLink: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   stats: { marginTop: 8 },
   statRow: {
@@ -253,13 +295,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  statLabel: { fontFamily: FONT, fontSize: 13, letterSpacing: 1, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' },
+  statLabel: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' },
   statValue: { fontFamily: FONT, fontSize: 15, letterSpacing: 0.8, color: '#fff', textTransform: 'uppercase' },
   chart: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 14 },
   emptyChart: { paddingVertical: 16 },
 
   matchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, gap: 12 },
   matchName: { flexShrink: 1, fontFamily: FONT, fontSize: 15, letterSpacing: 0.8, color: '#fff', textTransform: 'uppercase' },
-  link: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.4, textTransform: 'uppercase' },
-  mutedTag: { fontFamily: FONT, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' },
+  link: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase' },
+  mutedTag: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' },
 });

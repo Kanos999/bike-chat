@@ -286,3 +286,8 @@ export async function getRideMatches(rideId: string): Promise<string[]> {
   );
   return rows.map((r) => r.matched_username);
 }
+
+export async function deleteRide(rideId: string): Promise<void> {
+  // RLS scopes deletes to the owner's rows; ride_matches cascade on the FK.
+  await rest<void>(`/rides?id=eq.${encodeURIComponent(rideId)}`, { method: 'DELETE' });
+}

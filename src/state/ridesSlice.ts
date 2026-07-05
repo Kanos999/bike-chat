@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import {
+  deleteRide as deleteRideRequest,
   getRideMatches,
   listRides,
   saveRide as saveRideRequest,
@@ -16,6 +17,7 @@ export interface RidesSlice {
   ridesError: string | null;
   loadRides: () => Promise<void>;
   loadRideMatches: (rideId: string) => Promise<void>;
+  deleteRide: (rideId: string) => Promise<{ error?: string }>;
   saveRide: (
     summary: RideSummary,
     rideMode: string,
@@ -53,6 +55,20 @@ export const createRidesSlice: StateCreator<
       set((s) => ({ matchesByRide: { ...s.matchesByRide, [rideId]: usernames } }));
     } catch (e) {
       set({ ridesError: e instanceof Error ? e.message : 'Failed to load matched riders' });
+    }
+  },
+
+  deleteRide: async (rideId) => {
+    try {
+      await deleteRideRequest(rideId);
+      set((s) => {
+        const matchesByRide = { ...s.matchesByRide };
+        delete matchesByRide[rideId];
+        return { rides: s.rides.filter((r) => r.id !== rideId), matchesByRide };
+      });
+      return {};
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'Failed to delete ride' };
     }
   },
 

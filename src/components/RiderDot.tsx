@@ -9,8 +9,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
-import { Accent, FONT, HELMET_PATH } from './bikerTheme';
+import { Accent, FONT } from './bikerTheme';
+import AudioBars from './AudioBars';
 
 export interface Rider {
   id: number;
@@ -22,8 +22,8 @@ export interface Rider {
 
 // Fixed-width anchor so the bubble centres exactly on its radar point regardless
 // of how wide the handle label renders.
-const ANCHOR_W = 72;
-const BUBBLE = 30;
+const ANCHOR_W = 80;
+const BUBBLE = 38;
 
 interface Props {
   rider: Rider;
@@ -100,13 +100,11 @@ function RiderDot({ rider, radarSize, accent }: Props) {
             bubbleGlowStyle,
           ]}
         >
-          <Svg width={13} height={13} viewBox="0 0 24 24">
-            <Path d={HELMET_PATH} fill={speaking ? '#000' : 'rgba(255,255,255,0.38)'} />
-          </Svg>
+          <AudioBars size={19} color={speaking ? '#000' : 'rgba(255,255,255,0.62)'} />
         </Animated.View>
         <Text
           numberOfLines={1}
-          style={[styles.handle, { color: speaking ? accent.base : 'rgba(255,255,255,0.32)' }]}
+          style={[styles.handle, { color: speaking ? accent.base : 'rgba(255,255,255,0.44)' }]}
         >
           {rider.handle}
         </Text>
@@ -137,17 +135,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   handle: {
-    marginTop: 3,
-    fontSize: 9,
+    marginTop: 4,
+    fontSize: 12,
     fontFamily: FONT,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   dist: {
     marginTop: 1,
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: FONT,
-    color: 'rgba(255,255,255,0.18)',
+    color: 'rgba(255,255,255,0.44)',
   },
 });
 

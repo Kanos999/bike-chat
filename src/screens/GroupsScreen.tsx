@@ -30,7 +30,7 @@ export default function GroupsScreen({ navigation }: { navigation: AppNavigation
                 { backgroundColor: on ? accent.base : 'transparent', borderColor: on ? accent.base : 'rgba(255,255,255,0.1)' },
               ]}
             >
-              <Text style={[styles.segText, { color: on ? '#000' : 'rgba(255,255,255,0.5)' }]}>{t}</Text>
+              <Text style={[styles.segText, { color: on ? '#000' : 'rgba(255,255,255,0.62)' }]}>{t}</Text>
             </Pressable>
           );
         })}
@@ -301,7 +301,7 @@ function CrewsTab() {
                       { borderColor: on ? accent.base : 'rgba(255,255,255,0.12)', backgroundColor: on ? accent.dim : 'transparent' },
                     ]}
                   >
-                    <Text style={[styles.pickChipText, { color: on ? accent.base : 'rgba(255,255,255,0.55)' }]}>{f.username}</Text>
+                    <Text style={[styles.pickChipText, { color: on ? accent.base : 'rgba(255,255,255,0.67)' }]}>{f.username}</Text>
                   </Pressable>
                 );
               })}
@@ -325,7 +325,7 @@ function CrewsTab() {
             autoCorrect={false}
           />
           <Pressable onPress={onJoin} disabled={!joinCode.trim()}>
-            <Text style={[styles.link, { color: joinCode.trim() ? accent.base : 'rgba(255,255,255,0.3)' }]}>Join</Text>
+            <Text style={[styles.link, { color: joinCode.trim() ? accent.base : 'rgba(255,255,255,0.42)' }]}>Join</Text>
           </Pressable>
         </View>
       </Card>
@@ -471,9 +471,9 @@ const styles = StyleSheet.create({
   errorCard: { borderColor: 'rgba(255,107,107,0.4)' },
   errorText: { fontFamily: FONT, fontSize: 13, letterSpacing: 1, color: '#ff6b6b' },
 
-  link: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' },
+  link: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.67)' },
   danger: { color: '#ff6b6b' },
-  mutedTag: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' },
+  mutedTag: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.42)' },
   rowActions: { flexDirection: 'row', gap: 16, alignItems: 'center' },
 
   pickLabel: {
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'rgba(255,255,255,0.42)',
     marginBottom: 10,
   },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

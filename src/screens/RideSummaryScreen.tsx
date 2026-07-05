@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   flexShrink: { flexShrink: 1 },
   rideRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   rideDate: { fontFamily: FONT, fontSize: 16, letterSpacing: 0.8, color: '#fff', textTransform: 'uppercase' },
-  rideSub: { marginTop: 3, fontFamily: FONT, fontSize: 12, letterSpacing: 1, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' },
+  rideSub: { marginTop: 3, fontFamily: FONT, fontSize: 12, letterSpacing: 1, color: 'rgba(255,255,255,0.52)', textTransform: 'uppercase' },
   chevron: { fontSize: 26, lineHeight: 26 },
 
   stats: { marginTop: 8 },
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  statLabel: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' },
+  statLabel: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: 'rgba(255,255,255,0.57)', textTransform: 'uppercase' },
   statValue: { fontFamily: FONT, fontSize: 15, letterSpacing: 0.8, color: '#fff', textTransform: 'uppercase' },
   chart: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 14 },
   emptyChart: { paddingVertical: 16 },
@@ -303,5 +303,5 @@ const styles = StyleSheet.create({
   matchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, gap: 12 },
   matchName: { flexShrink: 1, fontFamily: FONT, fontSize: 15, letterSpacing: 0.8, color: '#fff', textTransform: 'uppercase' },
   link: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase' },
-  mutedTag: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' },
+  mutedTag: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.42)' },
 });

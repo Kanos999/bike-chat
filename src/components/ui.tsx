@@ -41,7 +41,7 @@ export function Muted({ children, numberOfLines }: { children: React.ReactNode; 
 export function TextField(props: TextInputProps) {
   return (
     <TextInput
-      placeholderTextColor="rgba(255,255,255,0.22)"
+      placeholderTextColor="rgba(255,255,255,0.34)"
       {...props}
       style={[styles.input, props.style]}
     />
@@ -94,7 +94,7 @@ export function PrimaryButton({
       {loading ? (
         <ActivityIndicator color={accent.base} />
       ) : (
-        <Text style={[styles.primaryText, { color: enabled ? accent.base : 'rgba(255,255,255,0.38)' }]}>
+        <Text style={[styles.primaryText, { color: enabled ? accent.base : 'rgba(255,255,255,0.50)' }]}>
           {label}
         </Text>
       )}
@@ -116,7 +116,7 @@ export function GhostButton({
   danger?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const color = danger ? '#ff6b6b' : 'rgba(255,255,255,0.6)';
+  const color = danger ? '#ff6b6b' : 'rgba(255,255,255,0.72)';
   const border = danger ? 'rgba(255,107,107,0.4)' : 'rgba(255,255,255,0.1)';
   return (
     <Pressable
@@ -178,7 +178,7 @@ export function Chip({ label, accent, on }: { label: string; accent?: Accent; on
         },
       ]}
     >
-      <Text style={[styles.chipText, { color: on ? a.base : 'rgba(255,255,255,0.3)' }]}>{label}</Text>
+      <Text style={[styles.chipText, { color: on ? a.base : 'rgba(255,255,255,0.42)' }]}>{label}</Text>
     </View>
   );
 }
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 13,
     letterSpacing: 2.4,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.52)',
     textTransform: 'uppercase',
   },
   muted: {
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     letterSpacing: 0.6,
     lineHeight: 18,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.52)',
   },
   input: {
     backgroundColor: COLORS.innerA,
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 12,
     letterSpacing: 1,
-    color: 'rgba(255,255,255,0.3)',
+    color: 'rgba(255,255,255,0.42)',
     textTransform: 'uppercase',
   },
   chip: {

@@ -146,7 +146,7 @@ const LoginScreen = () => {
                   value={phone}
                   onChangeText={setPhone}
                   placeholder="0400 111 222"
-                  placeholderTextColor="rgba(255,255,255,0.22)"
+                  placeholderTextColor="rgba(255,255,255,0.34)"
                   autoCapitalize="none"
                   keyboardType="phone-pad"
                   editable={!authLoading && step === 'phone'}
@@ -161,7 +161,7 @@ const LoginScreen = () => {
                     value={code}
                     onChangeText={setCode}
                     placeholder="SMS code"
-                    placeholderTextColor="rgba(255,255,255,0.22)"
+                    placeholderTextColor="rgba(255,255,255,0.34)"
                     keyboardType="number-pad"
                     editable={!authLoading}
                     autoFocus
@@ -204,7 +204,7 @@ const LoginScreen = () => {
                 <Text
                   style={[
                     styles.buttonText,
-                    { color: enabled ? accent.base : 'rgba(255,255,255,0.38)' },
+                    { color: enabled ? accent.base : 'rgba(255,255,255,0.50)' },
                   ]}
                 >
                   {step === 'phone' ? 'Send Code' : 'Verify Code'}
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 13,
     letterSpacing: 1.8,
-    color: 'rgba(255,255,255,0.28)',
+    color: 'rgba(255,255,255,0.40)',
     textTransform: 'uppercase',
   },
 
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 12,
     letterSpacing: 2,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.52)',
     textTransform: 'uppercase',
     marginBottom: 8,
   },
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     color: accent.base,
     textTransform: 'uppercase',
   },
-  linkDim: { color: 'rgba(255,255,255,0.35)' },
+  linkDim: { color: 'rgba(255,255,255,0.47)' },
 });
 
 export default LoginScreen;

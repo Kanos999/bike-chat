@@ -270,7 +270,7 @@ const HomeScreen = ({ navigation }: { navigation: AppNavigation }) => {
     const progress = rideButtonProgress.value;
     const pulse = rideButtonPulse.value;
     return {
-      borderColor: interpolateColor(progress, [0, 1], ['rgba(0,0,0,0.08)', 'rgba(255,255,255,0.18)']),
+      borderColor: interpolateColor(progress, [0, 1], ['rgba(0,0,0,0.08)', 'rgba(255,255,255,0.30)']),
       backgroundColor: interpolateColor(progress, [0, 1], ['rgba(255,255,255,0)', 'rgba(0,0,0,0.06)']),
       transform: [{ scale: 1 - pulse * 0.012 }],
     };

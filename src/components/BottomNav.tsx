@@ -9,11 +9,13 @@ import { useAppStore } from '../state/store';
 
 export type NavTabLabel = 'Comms' | 'Groups' | 'Routes' | 'Profile';
 
-const NAV_TABS: { label: NavTabLabel; route: keyof RootTabParamList; d: string }[] = [
+const NAV_TABS: { label: NavTabLabel; route: keyof RootTabParamList; d: string; vb?: string }[] = [
   { label: 'Comms', route: 'Home', d: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z' },
   {
     label: 'Groups',
     route: 'Groups',
+    // The heads sit slightly above y=0, so widen the viewBox top to avoid clipping.
+    vb: '0 -2 24 24',
     d: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
   },
   { label: 'Routes', route: 'RideSummary', d: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2z' },
@@ -57,7 +59,7 @@ function BottomNav({ state, navigation }: BottomTabBarProps) {
       {NAV_TABS.map((tab) => {
         const routeKey = state.routes.find((r) => r.name === tab.route)?.key ?? tab.route;
         const isActive = tab.route === activeRoute;
-        const color = isActive ? accent.base : 'rgba(255,255,255,0.2)';
+        const color = isActive ? accent.base : 'rgba(255,255,255,0.32)';
         const badge = badgeFor(tab.label);
         return (
           <Pressable
@@ -68,7 +70,7 @@ function BottomNav({ state, navigation }: BottomTabBarProps) {
             onPress={() => onTab(tab.route, routeKey)}
           >
             <View>
-              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+              <Svg width={24} height={24} viewBox={tab.vb ?? '0 0 24 24'} fill="none">
                 <Path d={tab.d} stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
               {badge > 0 ? (

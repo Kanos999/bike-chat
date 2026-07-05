@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
   safe: { flex: 1 },
   header: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 12,
     paddingBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -140,5 +140,5 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   body: { flex: 1 },
-  bodyContent: { paddingHorizontal: 24, paddingBottom: 24, gap: 16 },
+  bodyContent: { paddingHorizontal: 12, paddingBottom: 24, gap: 16 },
 });

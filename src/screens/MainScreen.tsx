@@ -24,7 +24,8 @@ import Animated, {
 import Svg, { Path, Rect } from 'react-native-svg';
 import ConcentricRings from '../components/ConcentricRings';
 import RiderDot, { Rider } from '../components/RiderDot';
-import { accentFor, COLORS, FONT, HELMET_PATH, Mode } from '../components/bikerTheme';
+import { accentFor, COLORS, FONT, Mode } from '../components/bikerTheme';
+import AudioBars from '../components/AudioBars';
 import { services } from '../modules/services';
 import { useAppStore } from '../state/store';
 
@@ -173,7 +174,7 @@ export default function MainScreen() {
             <Text
               style={[
                 styles.helmetChipText,
-                { color: helmetConnected ? accent.base : 'rgba(255,255,255,0.3)' },
+                { color: helmetConnected ? accent.base : 'rgba(255,255,255,0.42)' },
               ]}
             >
               {helmetConnected ? 'Intercom' : 'Phone audio'}
@@ -206,7 +207,7 @@ export default function MainScreen() {
               style={[
                 styles.countDot,
                 {
-                  backgroundColor: isRiding ? accent.base : 'rgba(255,255,255,0.18)',
+                  backgroundColor: isRiding ? accent.base : 'rgba(255,255,255,0.30)',
                   shadowColor: accent.base,
                   shadowOpacity: isRiding ? 1 : 0,
                   shadowRadius: isRiding ? 8 : 0,
@@ -221,7 +222,8 @@ export default function MainScreen() {
             </Text>
           </View>
 
-          {/* Active channel / transmission bar */}
+          {/* Active channel / transmission bar — only shown during a ride. */}
+          {isRiding ? (
           <View
             style={[
               styles.speakerBar,
@@ -258,6 +260,7 @@ export default function MainScreen() {
               </View>
             )}
           </View>
+          ) : null}
 
         </View>
 
@@ -341,7 +344,7 @@ function ToggleLabel({
   // t = 0 when this segment is active (under the indicator), 1 when inactive.
   const textStyle = useAnimatedStyle(() => {
     const t = index === 0 ? seg.value : 1 - seg.value;
-    return { color: interpolateColor(t, [0, 1], ['#000', 'rgba(255,255,255,0.28)']) };
+    return { color: interpolateColor(t, [0, 1], ['#000', 'rgba(255,255,255,0.40)']) };
   });
   return (
     <Pressable onPress={onPress} disabled={disabled} style={styles.toggleSeg}>
@@ -390,11 +393,9 @@ function CentreBubble({ riding, accent }: { riding: boolean; accent: ReturnType<
           glowStyle,
         ]}
       >
-        <Svg width={22} height={22} viewBox="0 0 24 24">
-          <Path d={HELMET_PATH} fill={riding ? '#000' : 'rgba(255,255,255,0.55)'} />
-        </Svg>
+        <AudioBars size={30} color={riding ? '#000' : 'rgba(255,255,255,0.72)'} />
       </Animated.View>
-      <Text style={[styles.centreLabel, { color: riding ? accent.base : 'rgba(255,255,255,0.28)' }]}>
+      <Text style={[styles.centreLabel, { color: riding ? accent.base : 'rgba(255,255,255,0.62)' }]}>
         {riding ? 'On Air' : 'You'}
       </Text>
     </Animated.View>
@@ -485,10 +486,10 @@ function RideButton({
           </Svg>
         ) : (
           <Svg width={18} height={18} viewBox="0 0 24 24">
-            <Path d="M5 3l14 9-14 9V3z" fill="rgba(255,255,255,0.4)" />
+            <Path d="M5 3l14 9-14 9V3z" fill="rgba(255,255,255,0.52)" />
           </Svg>
         )}
-        <Text style={[styles.rideText, { color: riding ? accent.base : 'rgba(255,255,255,0.38)' }]}>
+        <Text style={[styles.rideText, { color: riding ? accent.base : 'rgba(255,255,255,0.50)' }]}>
           {label}
         </Text>
       </Animated.View>
@@ -502,7 +503,7 @@ const styles = StyleSheet.create({
   flexShrink: { flexShrink: 1 },
 
   header: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 12,
     paddingBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -525,7 +526,7 @@ const styles = StyleSheet.create({
   },
   helmetChipText: { fontFamily: FONT, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' },
 
-  toggleWrap: { paddingHorizontal: 24, paddingBottom: 18 },
+  toggleWrap: { paddingHorizontal: 12, paddingBottom: 18 },
   toggle: {
     flexDirection: 'row',
     gap: 3,
@@ -539,7 +540,7 @@ const styles = StyleSheet.create({
   toggleIndicator: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 7 },
   toggleText: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.8, textTransform: 'uppercase' },
 
-  radarArea: { flex: 1, paddingHorizontal: 24 },
+  radarArea: { flex: 1, paddingHorizontal: 12 },
   radarWrap: { flex: 1, minHeight: 0, width: '100%', alignItems: 'center', justifyContent: 'center' },
   radar: { width: '100%', maxWidth: 320, maxHeight: '100%', aspectRatio: 1, alignSelf: 'center' },
 
@@ -547,21 +548,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginTop: -28,
-    marginLeft: -28,
-    width: 56,
+    marginTop: -33,
+    marginLeft: -40,
+    width: 80,
     alignItems: 'center',
   },
   centreBubble: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 0 },
   },
-  centreLabel: { marginTop: 5, fontFamily: FONT, fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase' },
+  centreLabel: { marginTop: 6, fontFamily: FONT, fontSize: 13, letterSpacing: 1.6, textTransform: 'uppercase' },
 
   countRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 14 },
   countDot: { width: 6, height: 6, borderRadius: 3, shadowOffset: { width: 0, height: 0 } },
@@ -569,7 +570,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 12,
     letterSpacing: 1.6,
-    color: 'rgba(255,255,255,0.25)',
+    color: 'rgba(255,255,255,0.37)',
     textTransform: 'uppercase',
   },
 
@@ -592,14 +593,14 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 10,
     letterSpacing: 1.2,
-    color: 'rgba(255,255,255,0.25)',
+    color: 'rgba(255,255,255,0.37)',
     textTransform: 'uppercase',
   },
   speakerClearText: {
     fontFamily: FONT,
     fontSize: 12,
     letterSpacing: 1.5,
-    color: 'rgba(255,255,255,0.18)',
+    color: 'rgba(255,255,255,0.30)',
     textTransform: 'uppercase',
   },
   coords: {
@@ -607,10 +608,10 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 11,
     letterSpacing: 1,
-    color: 'rgba(255,255,255,0.32)',
+    color: 'rgba(255,255,255,0.44)',
   },
 
-  buttonStrip: { paddingHorizontal: 24, paddingTop: 18, paddingBottom: 12, backgroundColor: 'rgba(12,12,12,0.95)' },
+  buttonStrip: { paddingHorizontal: 12, paddingTop: 18, paddingBottom: 12, backgroundColor: 'rgba(12,12,12,0.95)' },
   rideButton: {
     width: '100%',
     height: 64,

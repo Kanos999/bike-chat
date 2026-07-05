@@ -125,7 +125,7 @@ export default function SettingsScreen({ navigation }: { navigation: AppNavigati
                   { backgroundColor: on ? accent.base : 'transparent', borderColor: on ? accent.base : 'rgba(255,255,255,0.1)' },
                 ]}
               >
-                <Text style={[styles.segText, { color: on ? '#000' : 'rgba(255,255,255,0.5)' }]}>{opt.label}</Text>
+                <Text style={[styles.segText, { color: on ? '#000' : 'rgba(255,255,255,0.62)' }]}>{opt.label}</Text>
               </Pressable>
             );
           })}
@@ -171,7 +171,7 @@ export default function SettingsScreen({ navigation }: { navigation: AppNavigati
               label={u}
               right={
                 <Pressable onPress={() => void removeBlock(u)}>
-                  <Text style={[styles.link, { color: 'rgba(255,255,255,0.55)' }]}>Unblock</Text>
+                  <Text style={[styles.link, { color: 'rgba(255,255,255,0.67)' }]}>Unblock</Text>
                 </Pressable>
               }
             />
@@ -183,7 +183,7 @@ export default function SettingsScreen({ navigation }: { navigation: AppNavigati
         <SectionLabel>Audio path</SectionLabel>
         <ListRow
           label="Helmet link"
-          right={<Text style={[styles.value, { color: helmetConnected ? accent.base : 'rgba(255,255,255,0.5)' }]}>{helmetConnected ? 'Connected' : 'Phone audio'}</Text>}
+          right={<Text style={[styles.value, { color: helmetConnected ? accent.base : 'rgba(255,255,255,0.62)' }]}>{helmetConnected ? 'Connected' : 'Phone audio'}</Text>}
         />
         <View style={styles.divider} />
         <ListRow label="Current route" right={<Text style={styles.value}>{audioRoute}</Text>} />

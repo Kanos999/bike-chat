@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 11,
     letterSpacing: 1.4,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.52)',
     textTransform: 'uppercase',
     marginTop: 6,
     marginBottom: 20,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT,
     fontSize: 13,
     letterSpacing: 1.4,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.52)',
     textTransform: 'uppercase',
   },
 });

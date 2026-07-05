@@ -60,10 +60,16 @@ function BottomNav({ state, navigation }: BottomTabBarProps) {
         const color = isActive ? accent.base : 'rgba(255,255,255,0.2)';
         const badge = badgeFor(tab.label);
         return (
-          <Pressable key={tab.label} style={styles.navTab} onPress={() => onTab(tab.route, routeKey)}>
+          <Pressable
+            key={tab.label}
+            accessibilityRole="button"
+            accessibilityLabel={tab.label}
+            style={styles.navTab}
+            onPress={() => onTab(tab.route, routeKey)}
+          >
             <View>
-              <Svg width={19} height={19} viewBox="0 0 24 24" fill="none">
-                <Path d={tab.d} stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                <Path d={tab.d} stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
               {badge > 0 ? (
                 <View style={[styles.badge, { backgroundColor: accent.base }]}>
@@ -71,7 +77,6 @@ function BottomNav({ state, navigation }: BottomTabBarProps) {
                 </View>
               ) : null}
             </View>
-            <Text style={[styles.navLabel, { color }]}>{tab.label}</Text>
           </Pressable>
         );
       })}
@@ -87,13 +92,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     // Symmetric top padding so the icons sit centred (no larger gap below than
     // above); no fixed height so the row grows to fit and never clips the icons.
-    paddingTop: 12,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.04)',
     backgroundColor: 'rgba(12,12,12,0.95)',
   },
-  navTab: { alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 4 },
-  navLabel: { fontFamily: FONT, fontSize: 9, letterSpacing: 1.1, textTransform: 'uppercase' },
+  navTab: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, paddingVertical: 6 },
   badge: {
     position: 'absolute',
     top: -6,
@@ -105,7 +109,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeText: { fontFamily: FONT, fontSize: 10, letterSpacing: 0.5, color: '#000' },
+  badgeText: { fontFamily: FONT, fontSize: 11, letterSpacing: 0.5, color: '#000' },
 });
 
 export default BottomNav;

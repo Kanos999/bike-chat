@@ -186,13 +186,18 @@ export default function MainScreen() {
 
         {/* Radar area */}
         <View style={styles.radarArea}>
-          <View ref={radarRef} onLayout={onRadarLayout} style={styles.radar}>
-            {isRiding &&
-              radarSize > 0 &&
-              riders.map(({ riderId, rider }) => (
-                <RiderDot key={riderId} rider={rider} radarSize={radarSize} accent={accent} />
-              ))}
-            <CentreBubble riding={isRiding} accent={accent} />
+          {/* Wrapper flexes to fill remaining height so the square radar shrinks to
+              fit on short screens instead of pushing the count/speaker bar onto the
+              ride button. */}
+          <View style={styles.radarWrap}>
+            <View ref={radarRef} onLayout={onRadarLayout} style={styles.radar}>
+              {isRiding &&
+                radarSize > 0 &&
+                riders.map(({ riderId, rider }) => (
+                  <RiderDot key={riderId} rider={rider} radarSize={radarSize} accent={accent} />
+                ))}
+              <CentreBubble riding={isRiding} accent={accent} />
+            </View>
           </View>
 
           {/* Rider count */}
@@ -518,7 +523,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     marginLeft: 12,
   },
-  helmetChipText: { fontFamily: FONT, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase' },
+  helmetChipText: { fontFamily: FONT, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   toggleWrap: { paddingHorizontal: 24, paddingBottom: 18 },
   toggle: {
@@ -532,10 +537,11 @@ const styles = StyleSheet.create({
   },
   toggleSeg: { flex: 1, paddingVertical: 9, borderRadius: 7, alignItems: 'center', zIndex: 1 },
   toggleIndicator: { position: 'absolute', left: 3, top: 3, bottom: 3, borderRadius: 7 },
-  toggleText: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.8, textTransform: 'uppercase' },
+  toggleText: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.8, textTransform: 'uppercase' },
 
-  radarArea: { flex: 1, paddingHorizontal: 24, alignItems: 'center' },
-  radar: { width: '100%', maxWidth: 320, aspectRatio: 1, alignSelf: 'center' },
+  radarArea: { flex: 1, paddingHorizontal: 24 },
+  radarWrap: { flex: 1, minHeight: 0, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  radar: { width: '100%', maxWidth: 320, maxHeight: '100%', aspectRatio: 1, alignSelf: 'center' },
 
   centreWrap: {
     position: 'absolute',
@@ -555,13 +561,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 0 },
   },
-  centreLabel: { marginTop: 5, fontFamily: FONT, fontSize: 9, letterSpacing: 1.6, textTransform: 'uppercase' },
+  centreLabel: { marginTop: 5, fontFamily: FONT, fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase' },
 
   countRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 14 },
   countDot: { width: 6, height: 6, borderRadius: 3, shadowOffset: { width: 0, height: 0 } },
   countText: {
     fontFamily: FONT,
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 1.6,
     color: 'rgba(255,255,255,0.25)',
     textTransform: 'uppercase',
@@ -581,17 +587,17 @@ const styles = StyleSheet.create({
   },
   waveform: { flexDirection: 'row', alignItems: 'center', gap: 2.5, height: 18 },
   waveBar: { width: 2.5, borderRadius: 2 },
-  speakerHandle: { fontFamily: FONT, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase' },
+  speakerHandle: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
   speakerSub: {
     fontFamily: FONT,
-    fontSize: 9,
+    fontSize: 10,
     letterSpacing: 1.2,
     color: 'rgba(255,255,255,0.25)',
     textTransform: 'uppercase',
   },
   speakerClearText: {
     fontFamily: FONT,
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 1.5,
     color: 'rgba(255,255,255,0.18)',
     textTransform: 'uppercase',
@@ -599,7 +605,7 @@ const styles = StyleSheet.create({
   coords: {
     marginTop: 3,
     fontFamily: FONT,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1,
     color: 'rgba(255,255,255,0.32)',
   },

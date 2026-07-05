@@ -138,14 +138,14 @@ const styles = StyleSheet.create({
   },
   handle: {
     marginTop: 3,
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: FONT,
     letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   dist: {
     marginTop: 1,
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: FONT,
     color: 'rgba(255,255,255,0.18)',
   },

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -12,6 +13,8 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Accent, accentFor, COLORS, FONT } from './bikerTheme';
+
+const IS_IOS = Platform.OS === 'ios';
 
 const DEFAULT_ACCENT = accentFor('open');
 
@@ -70,10 +73,12 @@ export function PrimaryButton({
         styles.primaryButton,
         {
           borderColor: enabled ? accent.base : 'rgba(255,255,255,0.09)',
+          // Glow via shadow* is iOS-only. On Android `elevation` renders a hard black
+          // rectangle behind this translucent button (shadowColor is ignored), which
+          // shows as a dark box — so no elevation here; the accent border carries it.
           shadowColor: accent.base,
-          shadowOpacity: enabled ? 0.4 : 0,
-          shadowRadius: enabled ? 24 : 0,
-          elevation: enabled ? 6 : 0,
+          shadowOpacity: IS_IOS && enabled ? 0.4 : 0,
+          shadowRadius: IS_IOS && enabled ? 24 : 0,
         },
         style,
       ]}
@@ -189,14 +194,14 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontFamily: FONT,
-    fontSize: 11,
+    fontSize: 13,
     letterSpacing: 2.4,
     color: 'rgba(255,255,255,0.4)',
     textTransform: 'uppercase',
   },
   muted: {
     fontFamily: FONT,
-    fontSize: 12,
+    fontSize: 14,
     letterSpacing: 0.6,
     lineHeight: 18,
     color: 'rgba(255,255,255,0.4)',
@@ -244,7 +249,7 @@ const styles = StyleSheet.create({
   rowSub: {
     marginTop: 2,
     fontFamily: FONT,
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 1,
     color: 'rgba(255,255,255,0.3)',
     textTransform: 'uppercase',
@@ -255,5 +260,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  chipText: { fontFamily: FONT, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase' },
+  chipText: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.4, textTransform: 'uppercase' },
 });

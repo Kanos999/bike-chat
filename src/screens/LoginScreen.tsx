@@ -24,6 +24,8 @@ const accent = accentFor('open');
 // (e.g. 0400 111 222) and we build the E.164 form (+61 400 111 222) for Supabase —
 // the leading trunk "0" is dropped, per E.164.
 const AU_DIAL_CODE = '+61';
+// Supabase SMS OTP length (Authentication → Providers → Phone). Keep in sync.
+const OTP_LENGTH = 6;
 const nationalDigits = (local: string): string => {
   let d = local.replace(/\D/g, '').replace(/^0+/, '');
   // Guard against a user who typed the country code too (e.g. +61 / 0061), which
@@ -115,6 +117,19 @@ const LoginScreen = () => {
     }
   };
 
+  // Auto-submit once the full code lands (typed or OS-autofilled), so a filled code
+  // verifies without an extra tap. Guarded by ref so a failed code isn't re-submitted.
+  const autoSubmittedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (step !== 'code' || authLoading) return;
+    if (code.length !== OTP_LENGTH || !canVerifyOtp) return;
+    if (autoSubmittedRef.current === code) return;
+    autoSubmittedRef.current = code;
+    void onVerifyCode();
+    // onVerifyCode intentionally omitted — it closes over the current code/phone.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, step, authLoading, canVerifyOtp]);
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
@@ -149,6 +164,9 @@ const LoginScreen = () => {
                   placeholderTextColor="rgba(255,255,255,0.34)"
                   autoCapitalize="none"
                   keyboardType="phone-pad"
+                  // Offer the device's own number from the keyboard autofill bar.
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
                   editable={!authLoading && step === 'phone'}
                 />
               </View>
@@ -159,10 +177,16 @@ const LoginScreen = () => {
                   <TextInput
                     style={styles.input}
                     value={code}
-                    onChangeText={setCode}
+                    onChangeText={(t) => setCode(t.replace(/\D/g, ''))}
                     placeholder="SMS code"
                     placeholderTextColor="rgba(255,255,255,0.34)"
                     keyboardType="number-pad"
+                    // OS one-time-code autofill: Android reads it from the SMS
+                    // notification, iOS from the QuickType bar — no manual typing.
+                    autoComplete="sms-otp"
+                    textContentType="oneTimeCode"
+                    importantForAutofill="yes"
+                    maxLength={OTP_LENGTH}
                     editable={!authLoading}
                     autoFocus
                   />

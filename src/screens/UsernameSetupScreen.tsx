@@ -3,6 +3,7 @@ import { StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Muted, PrimaryButton, SectionLabel, TextField } from '../components/ui';
 import { accentFor, COLORS, FONT } from '../components/bikerTheme';
+import { validateCallsign } from '../modules/callsign';
 import { useAppStore } from '../state/store';
 
 const accent = accentFor('open');
@@ -18,16 +19,28 @@ export default function UsernameSetupScreen() {
   const syncProfile = useAppStore((s) => s.syncProfile);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const trimmed = draft.trim();
   const canSave = trimmed.length > 0 && !saving;
 
   const onContinue = async () => {
     if (!canSave) return;
+    const invalid = validateCallsign(trimmed);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
     setSaving(true);
+    setError(null);
     try {
+      // Server-first: reject a taken callsign before we commit it locally.
+      const result = await syncProfile(trimmed);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
       await setUsername(trimmed);
-      await syncProfile(trimmed);
       // Once username is set, App's gate falls through to the main screen.
     } finally {
       setSaving(false);
@@ -49,7 +62,10 @@ export default function UsernameSetupScreen() {
             <TextField
               style={styles.field}
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={(t) => {
+                setDraft(t);
+                if (error) setError(null);
+              }}
               placeholder="Your callsign"
               autoCapitalize="none"
               autoCorrect={false}
@@ -57,6 +73,7 @@ export default function UsernameSetupScreen() {
               returnKeyType="done"
               onSubmitEditing={onContinue}
             />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
             <PrimaryButton
               label={saving ? 'Saving' : 'Continue'}
               onPress={onContinue}
@@ -83,5 +100,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  field: { marginTop: 14, marginBottom: 16 },
+  field: { marginTop: 14, marginBottom: 10 },
+  error: { fontFamily: FONT, fontSize: 12, letterSpacing: 0.6, color: '#ff6b6b', marginBottom: 12 },
 });

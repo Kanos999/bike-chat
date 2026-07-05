@@ -53,7 +53,8 @@ export interface GroupsSlice {
   addBlock: (username: string) => Promise<void>;
   removeBlock: (username: string) => Promise<void>;
   setJoinAlert: (kind: JoinAlert) => Promise<void>;
-  syncProfile: (username: string) => Promise<void>;
+  /** Push the callsign to the server. Returns an error string if it's taken/failed. */
+  syncProfile: (username: string) => Promise<{ error?: string }>;
   notifyJoin: () => void;
   // Friends
   loadFriends: () => Promise<void>;
@@ -215,12 +216,17 @@ export const createGroupsSlice: StateCreator<
 
   syncProfile: async (username) => {
     const session = get().session;
-    if (!session) return;
+    if (!session) return {}; // no session yet: allow the local-only callsign to stand
     try {
       await upsertProfile(session.user.id, username, session.user.phone ?? null);
+      return {};
     } catch (e) {
-      // Non-fatal: the local username still works for the matcher.
-      set({ groupsError: e instanceof Error ? e.message : 'Failed to sync profile' });
+      const msg = e instanceof Error ? e.message : '';
+      // profiles.username is UNIQUE — a taken callsign surfaces as a 23505/duplicate.
+      if (/duplicate|unique|already|profiles_username/i.test(msg)) {
+        return { error: 'That callsign is already taken.' };
+      }
+      return { error: 'Could not save callsign — check your connection.' };
     }
   },
 

@@ -24,4 +24,6 @@ export interface BluetoothModule {
    * without a native implementation. `kind` matches the JoinAlert style.
    */
   playJoinTone?(kind: string): void;
+  /** Descending disconnect chime when a rider leaves the channel (same stream as playJoinTone). */
+  playLeaveTone?(kind: string): void;
 }

@@ -283,34 +283,33 @@ class BleModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     promise.resolve(currentAudioRoute())
   }
 
-  // Plays the bundled chime (res/raw/chime.mp3) with VOICE_COMMUNICATION usage so
-  // it follows the active SCO link into the helmet intercom (a media-usage sound is
-  // bumped to the phone speaker while the call holds SCO). Best-effort: any failure
-  // is swallowed. `kind` is accepted for API parity with the JS JoinAlert but the
-  // single chime is played for every non-"off" style.
+  // Rider joined the channel → the rising chime. `kind` is accepted for API parity
+  // with the JS JoinAlert but the single clip is played for every non-"off" style.
   @ReactMethod
-  fun playJoinTone(kind: String) {
+  fun playJoinTone(kind: String) = playTone(R.raw.chime)
+
+  // Rider left the channel → the descending disconnect chime (a reversed, pitched-
+  // down variant of the join chime).
+  @ReactMethod
+  fun playLeaveTone(kind: String) = playTone(R.raw.disconnect)
+
+  // Plays a bundled clip with VOICE_COMMUNICATION usage so it rides the same route
+  // and volume as the intercom itself — into the helmet over SCO when connected, or
+  // the earpiece/speaker the call is already using — tied to the *call* volume, not
+  // the (often ducked) media stream. Best-effort: any failure is swallowed.
+  private fun playTone(resId: Int) {
     try {
-      // With a helmet/headset present, use VOICE_COMMUNICATION so the chime rides
-      // the active SCO link into the intercom. With no such device that usage falls
-      // back to the front earpiece — so play it as MEDIA instead, which routes to
-      // the main loudspeaker.
-      val hasHeadset = isBluetoothVoiceAvailable() || isWiredAudioAvailable()
-      val usage = if (hasHeadset) {
-        android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION
-      } else {
-        android.media.AudioAttributes.USAGE_MEDIA
-      }
       val player = android.media.MediaPlayer()
       player.setAudioAttributes(
         android.media.AudioAttributes.Builder()
-          .setUsage(usage)
+          .setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION)
           .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
           .build()
       )
-      val afd = reactApplicationContext.resources.openRawResourceFd(R.raw.chime)
+      val afd = reactApplicationContext.resources.openRawResourceFd(resId)
       player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
       afd.close()
+      player.setVolume(1f, 1f) // max, relative to the voice-call stream
       // Release the player once the clip finishes so it isn't leaked.
       player.setOnCompletionListener { it.release() }
       player.setOnErrorListener { mp, _, _ -> mp.release(); true }

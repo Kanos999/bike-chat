@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { services } from '../modules/services';
 import { IntercomState } from '../modules/voice/types';
 import { GroupsSlice } from './groupsSlice';
+import { ProximitySlice } from './proximitySlice';
 import { RideSessionHandles } from './types';
 
 function samePeerIds(a: string[], b: string[]): boolean {
@@ -25,7 +26,7 @@ export interface VoiceSlice {
   setIntercomState: (state: IntercomState) => void;
 }
 
-type Store = VoiceSlice & GroupsSlice;
+type Store = VoiceSlice & GroupsSlice & ProximitySlice;
 
 export const createVoiceSlice: StateCreator<
   Store,
@@ -63,10 +64,15 @@ export const createVoiceSlice: StateCreator<
     handles.unsubscribeVoicePeers = services.voice.onPeersChange((peerIds) => {
       const prev = get().connectedPeerIds;
       if (samePeerIds(prev, peerIds)) return;
-      // A peer appearing in the WebRTC mesh is the real "rider joined" moment.
+      // A peer appearing / disappearing in the WebRTC mesh is the real "rider
+      // joined / left" moment.
       const someoneJoined = peerIds.some((id) => !prev.includes(id));
+      const someoneLeft = prev.some((id) => !peerIds.includes(id));
       set({ connectedPeerIds: peerIds });
       if (someoneJoined) get().notifyJoin();
+      // Only chime a leave while we're actually in a channel — this skips the mass
+      // peer-drop that happens when *we* end the ride / tear the channel down.
+      if (someoneLeft && get().currentChannelId) get().notifyLeave();
     });
   },
   setIntercomState: (state) =>

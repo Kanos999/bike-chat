@@ -39,3 +39,16 @@ export function playJoinAlert(kind: JoinAlert): void {
     /* vibration unavailable on this device — ignore */
   }
 }
+
+/**
+ * Vibration companion for the rider-leave alert: a single short buzz (distinct from
+ * the join pattern) alongside the descending disconnect chime. Off when alerts are.
+ */
+export function playLeaveAlert(kind: JoinAlert): void {
+  if (kind === 'off') return;
+  try {
+    Vibration.vibrate(70);
+  } catch {
+    /* ignore */
+  }
+}

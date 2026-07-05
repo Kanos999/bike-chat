@@ -6,6 +6,7 @@ import {
   SupabaseSession,
   verifySmsOtp,
 } from '../modules/auth/supabaseAuth';
+import { startTokenManager, stopTokenManager } from '../modules/auth/tokenManager';
 
 export interface AuthSlice {
   authReady: boolean;
@@ -16,11 +17,6 @@ export interface AuthSlice {
   requestPhoneOtp: (phone: string) => Promise<void>;
   verifyPhoneOtp: (phone: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
-}
-
-function applySessionToGlobals(session: SupabaseSession | null): void {
-  (global as unknown as { __BikeChatSupabaseAccessToken?: string }).__BikeChatSupabaseAccessToken =
-    session?.access_token;
 }
 
 export const createAuthSlice: StateCreator<
@@ -37,7 +33,8 @@ export const createAuthSlice: StateCreator<
     set({ authLoading: true, authError: null });
     try {
       const session = await getValidSession();
-      applySessionToGlobals(session);
+      // Keep the token fresh for the whole session; refreshes update the store too.
+      startTokenManager(session, (next) => set({ session: next }));
       set({ session, authReady: true, authLoading: false });
     } catch (error) {
       set({
@@ -62,7 +59,7 @@ export const createAuthSlice: StateCreator<
     set({ authLoading: true, authError: null });
     try {
       const session = await verifySmsOtp(phone, code);
-      applySessionToGlobals(session);
+      startTokenManager(session, (next) => set({ session: next }));
       set({ session, authLoading: false });
     } catch (error) {
       set({ authLoading: false, authError: error instanceof Error ? error.message : 'OTP verification failed' });
@@ -73,7 +70,7 @@ export const createAuthSlice: StateCreator<
     set({ authLoading: true, authError: null });
     try {
       await signOut(get().session);
-      applySessionToGlobals(null);
+      stopTokenManager();
       set({ session: null, authLoading: false });
     } catch (error) {
       set({ authLoading: false, authError: error instanceof Error ? error.message : 'Logout failed' });

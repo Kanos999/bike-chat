@@ -85,6 +85,16 @@ function createRealBluetoothModule(): BluetoothModule | null {
     }
   };
 
+  const playLeaveTone = (kind: string): void => {
+    if (typeof NativeBle.playLeaveTone === 'function') {
+      try {
+        NativeBle.playLeaveTone(kind);
+      } catch {
+        /* best-effort alert */
+      }
+    }
+  };
+
   const onAudioRouteChange = (listener: (route: AudioRoute) => void): (() => void) => {
     audioRouteSub = emitter.addListener('BleAudioRoute', (payload: { route: AudioRoute }) => {
       listener(payload.route);
@@ -113,6 +123,7 @@ function createRealBluetoothModule(): BluetoothModule | null {
     stopVoiceRoute,
     onAudioRouteChange,
     playJoinTone,
+    playLeaveTone,
   };
   return Object.assign(module, {
     simulateHeadsetEvent: (_event: HeadsetEventType) => {},

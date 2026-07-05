@@ -41,7 +41,7 @@ async function saveSession(session: SupabaseSession | null): Promise<void> {
   await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-async function loadStoredSession(): Promise<SupabaseSession | null> {
+export async function loadStoredSession(): Promise<SupabaseSession | null> {
   const raw = await AsyncStorage.getItem(SESSION_KEY);
   if (!raw) return null;
   try {

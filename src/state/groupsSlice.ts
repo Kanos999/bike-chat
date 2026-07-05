@@ -24,7 +24,7 @@ import {
   unblockUser,
   upsertProfile,
 } from '../modules/groups/supabaseData';
-import { DEFAULT_JOIN_ALERT, JoinAlert, playJoinAlert } from '../modules/notify/joinAlert';
+import { DEFAULT_JOIN_ALERT, JoinAlert, playJoinAlert, playLeaveAlert } from '../modules/notify/joinAlert';
 import { services } from '../modules/services';
 import { saveActiveGroupId, saveJoinAlert, StoredProfile } from './profileStorage';
 import type { AuthSlice } from './authSlice';
@@ -56,6 +56,7 @@ export interface GroupsSlice {
   /** Push the callsign to the server. Returns an error string if it's taken/failed. */
   syncProfile: (username: string) => Promise<{ error?: string }>;
   notifyJoin: () => void;
+  notifyLeave: () => void;
   // Friends
   loadFriends: () => Promise<void>;
   searchUsers: (query: string) => Promise<void>;
@@ -237,6 +238,14 @@ export const createGroupsSlice: StateCreator<
     // a vibration companion that also covers platforms without the native tone.
     services.bluetooth.playJoinTone?.(kind);
     playJoinAlert(kind);
+  },
+
+  notifyLeave: () => {
+    const kind = get().joinAlert;
+    if (kind === 'off') return;
+    // Descending disconnect chime + a short buzz when a rider leaves the channel.
+    services.bluetooth.playLeaveTone?.(kind);
+    playLeaveAlert(kind);
   },
 
   /* ----- Friends ----- */

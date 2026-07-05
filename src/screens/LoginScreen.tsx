@@ -1,7 +1,8 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   LayoutChangeEvent,
+  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -49,6 +50,14 @@ const LoginScreen = () => {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  // Cooldown (seconds) before the SMS code can be resent, so users don't spam it.
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+    const t = setTimeout(() => setResendIn((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
 
   // AU mobiles have 9 significant digits (4xx xxx xxx) once the trunk 0 is dropped.
   const canRequestOtp = useMemo(() => nationalDigits(phone).length >= 9, [phone]);
@@ -76,6 +85,18 @@ const LoginScreen = () => {
     try {
       await requestPhoneOtp(toE164AU(phone));
       setStep('code');
+      setResendIn(30);
+    } catch {
+      // handled by authError
+    }
+  };
+
+  const onResend = async () => {
+    if (resendIn > 0 || authLoading) return;
+    setLocalError(null);
+    try {
+      await requestPhoneOtp(toE164AU(phone));
+      setResendIn(30);
     } catch {
       // handled by authError
     }
@@ -161,10 +182,11 @@ const LoginScreen = () => {
                 styles.button,
                 {
                   borderColor: enabled ? accent.base : 'rgba(255,255,255,0.09)',
+                  // iOS-only glow; on Android elevation renders a hard black box behind
+                  // this translucent button, so we drop it and let the border carry it.
                   shadowColor: accent.base,
-                  shadowOpacity: enabled ? 0.5 : 0,
-                  shadowRadius: enabled ? 32 : 0,
-                  elevation: enabled ? 8 : 0,
+                  shadowOpacity: Platform.OS === 'ios' && enabled ? 0.5 : 0,
+                  shadowRadius: Platform.OS === 'ios' && enabled ? 32 : 0,
                 },
               ]}
             >
@@ -191,17 +213,25 @@ const LoginScreen = () => {
             </Pressable>
 
             {step === 'code' ? (
-              <Pressable
-                style={styles.linkWrap}
-                disabled={authLoading}
-                onPress={() => {
-                  setLocalError(null);
-                  setStep('phone');
-                  setCode('');
-                }}
-              >
-                <Text style={styles.link}>Use a different number</Text>
-              </Pressable>
+              <View style={styles.codeLinks}>
+                <Pressable disabled={authLoading || resendIn > 0} onPress={onResend} hitSlop={8}>
+                  <Text style={[styles.link, resendIn > 0 ? styles.linkDim : null]}>
+                    {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  disabled={authLoading}
+                  hitSlop={8}
+                  onPress={() => {
+                    setLocalError(null);
+                    setStep('phone');
+                    setCode('');
+                    setResendIn(0);
+                  }}
+                >
+                  <Text style={styles.link}>Use a different number</Text>
+                </Pressable>
+              </View>
             ) : null}
           </View>
         </Animated.View>
@@ -243,7 +273,7 @@ const styles = StyleSheet.create({
   tagline: {
     marginTop: 4,
     fontFamily: FONT,
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: 1.8,
     color: 'rgba(255,255,255,0.28)',
     textTransform: 'uppercase',
@@ -258,7 +288,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: FONT,
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 2,
     color: 'rgba(255,255,255,0.4)',
     textTransform: 'uppercase',
@@ -297,7 +327,7 @@ const styles = StyleSheet.create({
   error: {
     marginTop: 12,
     fontFamily: FONT,
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: 1,
     color: '#ff6b6b',
     textTransform: 'uppercase',
@@ -316,14 +346,21 @@ const styles = StyleSheet.create({
   },
   buttonText: { fontFamily: FONT, fontSize: 17, letterSpacing: 2.4, textTransform: 'uppercase' },
 
-  linkWrap: { marginTop: 18, alignSelf: 'center' },
+  codeLinks: {
+    marginTop: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
   link: {
     fontFamily: FONT,
-    fontSize: 13,
+    fontSize: 14,
     letterSpacing: 1.5,
     color: accent.base,
     textTransform: 'uppercase',
   },
+  linkDim: { color: 'rgba(255,255,255,0.35)' },
 });
 
 export default LoginScreen;

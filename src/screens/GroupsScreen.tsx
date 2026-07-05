@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import ScreenScaffold from '../components/ScreenScaffold';
+import CrewShareSheet from '../components/CrewShareSheet';
 import { Card, Chip, ListRow, Muted, PrimaryButton, SectionLabel, TextField } from '../components/ui';
 import { accentFor, FONT } from '../components/bikerTheme';
 import type { Friend } from '../modules/groups/supabaseData';
@@ -16,7 +17,7 @@ export default function GroupsScreen({ navigation }: { navigation: AppNavigation
   const groupsError = useAppStore((s) => s.groupsError);
 
   return (
-    <ScreenScaffold title="Crews" navigation={navigation} activeTab="Groups" accent={accent} rings>
+    <ScreenScaffold title={tab} navigation={navigation} activeTab="Groups" accent={accent} rings>
       <View style={styles.segment}>
         {(['Friends', 'Crews'] as Tab[]).map((t) => {
           const on = t === tab;
@@ -60,10 +61,15 @@ function FriendsTab() {
   const removeFriend = useAppStore((s) => s.removeFriend);
 
   const [query, setQuery] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void loadFriends();
   }, [loadFriends]);
+
+  useEffect(() => () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+  }, []);
 
   const incoming = friendRequests.filter((r) => r.direction === 'incoming');
   const outgoing = friendRequests.filter((r) => r.direction === 'outgoing');
@@ -74,8 +80,14 @@ function FriendsTab() {
 
   const onSearch = (text: string) => {
     setQuery(text);
-    if (text.trim()) void searchUsers(text);
-    else clearUserSearch();
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const q = text.trim();
+    if (!q) {
+      clearUserSearch();
+      return;
+    }
+    // Debounce so we fire one RPC after typing settles, not on every keystroke.
+    searchTimer.current = setTimeout(() => void searchUsers(q), 300);
   };
 
   const onRemove = (f: Friend) => {
@@ -199,6 +211,7 @@ function CrewsTab() {
   const [addingTo, setAddingTo] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
+  const [shareCrew, setShareCrew] = useState<{ name: string; code: string } | null>(null);
 
   const togglePicked = (id: string) =>
     setPicked((prev) => {
@@ -354,6 +367,9 @@ function CrewsTab() {
                 <Pressable onPress={() => onToggleExpand(g.id)}>
                   <Text style={styles.link}>{expanded ? 'Hide riders' : 'Riders'}</Text>
                 </Pressable>
+                <Pressable onPress={() => setShareCrew({ name: g.name, code: g.join_code })}>
+                  <Text style={[styles.link, { color: accent.base }]}>Share</Text>
+                </Pressable>
                 {owner ? (
                   <Pressable
                     onPress={() => {
@@ -434,6 +450,14 @@ function CrewsTab() {
           );
         })
       )}
+
+      <CrewShareSheet
+        visible={!!shareCrew}
+        name={shareCrew?.name ?? ''}
+        code={shareCrew?.code ?? ''}
+        accent={accent}
+        onClose={() => setShareCrew(null)}
+      />
     </>
   );
 }
@@ -441,20 +465,20 @@ function CrewsTab() {
 const styles = StyleSheet.create({
   segment: { flexDirection: 'row', gap: 8 },
   seg: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-  segText: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase' },
+  segText: { fontFamily: FONT, fontSize: 14, letterSpacing: 1.4, textTransform: 'uppercase' },
 
   field: { marginTop: 12, marginBottom: 14 },
   errorCard: { borderColor: 'rgba(255,107,107,0.4)' },
-  errorText: { fontFamily: FONT, fontSize: 12, letterSpacing: 1, color: '#ff6b6b' },
+  errorText: { fontFamily: FONT, fontSize: 13, letterSpacing: 1, color: '#ff6b6b' },
 
-  link: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' },
+  link: { fontFamily: FONT, fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' },
   danger: { color: '#ff6b6b' },
-  mutedTag: { fontFamily: FONT, fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' },
+  mutedTag: { fontFamily: FONT, fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' },
   rowActions: { flexDirection: 'row', gap: 16, alignItems: 'center' },
 
   pickLabel: {
     fontFamily: FONT,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
     color: 'rgba(255,255,255,0.3)',
@@ -462,7 +486,7 @@ const styles = StyleSheet.create({
   },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pickChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  pickChipText: { fontFamily: FONT, fontSize: 12, letterSpacing: 0.8, textTransform: 'uppercase' },
+  pickChipText: { fontFamily: FONT, fontSize: 13, letterSpacing: 0.8, textTransform: 'uppercase' },
   createBtn: { marginTop: 16 },
 
   joinRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },

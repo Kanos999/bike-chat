@@ -36,6 +36,13 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- Crew-invite deep links: bikechat://join?code=… (scanned from a crew QR). -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="bikechat" />
+        </intent-filter>
       </activity>
 
       <service

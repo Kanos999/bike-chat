@@ -1,9 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import {
+  DefaultTheme,
+  NavigationContainer,
+  useNavigationContainerRef,
+  type Theme,
+} from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { parseJoinCode } from '../modules/deepLink';
 import MainScreen from '../screens/MainScreen';
 import RideSummaryScreen from '../screens/RideSummaryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -52,6 +58,36 @@ const AppInner = () => {
   // Gate on the persisted profile having loaded so we don't flash the callsign
   // setup screen at existing users before hydrateProfile fills in their username.
   const [profileReady, setProfileReady] = useState(false);
+
+  // Crew-invite deep links (bikechat://join?code=…). The code is stashed until the
+  // navigator is ready (i.e. the user is signed in + has a callsign), then the crew
+  // is joined and we jump to the Groups tab.
+  const navRef = useNavigationContainerRef<RootTabParamList>();
+  const pendingJoin = useRef<string | null>(null);
+
+  const flushPendingJoin = useCallback(async () => {
+    const code = pendingJoin.current;
+    if (!code || !navRef.isReady()) return;
+    pendingJoin.current = null;
+    const group = await useAppStore.getState().joinGroup(code);
+    navRef.navigate('Groups');
+    Alert.alert(
+      group ? 'Crew joined' : "Couldn't join crew",
+      group ? `You've joined "${group.name}".` : 'That crew code is invalid or expired.',
+    );
+  }, [navRef]);
+
+  useEffect(() => {
+    const handle = (url: string | null) => {
+      const code = parseJoinCode(url);
+      if (!code) return;
+      pendingJoin.current = code;
+      void flushPendingJoin();
+    };
+    void Linking.getInitialURL().then(handle);
+    const sub = Linking.addEventListener('url', ({ url }) => handle(url));
+    return () => sub.remove();
+  }, [flushPendingJoin]);
 
   useEffect(() => {
     config.riderIdGetter = () => useAppStore.getState().riderId;
@@ -104,7 +140,7 @@ const AppInner = () => {
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navRef} theme={navTheme} onReady={flushPendingJoin}>
       <Tab.Navigator
         backBehavior="history"
         screenOptions={{ headerShown: false, lazy: true }}

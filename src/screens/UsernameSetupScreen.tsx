@@ -52,7 +52,7 @@ export default function UsernameSetupScreen() {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={styles.brand}>BIKE CHAT</Text>
+          <Text style={styles.brand}>CONVOII</Text>
           <Card>
             <SectionLabel>Choose your callsign</SectionLabel>
             <Muted>

@@ -26,7 +26,7 @@ export default function CrewShareSheet({
 
   const onShare = () => {
     void Share.share({
-      message: `Join my Bike Chat crew "${name}" — scan the QR or enter code ${code}.\n${url}`,
+      message: `Join my Convoii crew "${name}" — scan the QR or enter code ${code}.\n${url}`,
     });
   };
 

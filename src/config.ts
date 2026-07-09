@@ -56,6 +56,9 @@ export const config = {
   get supabaseAnonKey(): string | null {
     return getSupabase().anonKey;
   },
+  get googleWebClientId(): string | null {
+    return (global as unknown as { __BikeChatGoogleWebClientId?: string }).__BikeChatGoogleWebClientId ?? null;
+  },
   /** Set by app init so real voice can get current riderId. */
   riderIdGetter: null as (() => string) | null,
   getRiderId(): string {

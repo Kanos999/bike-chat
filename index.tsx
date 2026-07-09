@@ -11,6 +11,6 @@ import App from './src/app/App';
 // 'http://192.168.0.79:3001'.
 (global as unknown as { __BikeChatApiBaseUrl?: string }).__BikeChatApiBaseUrl = 'https://bike-chat.fly.dev';
 
-AppRegistry.registerComponent('BikeChat', () => App);
+AppRegistry.registerComponent('Convoii', () => App);
 
 export default App;

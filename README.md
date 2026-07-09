@@ -385,13 +385,18 @@ To force mocks only, you would set the service flags in `src/modules/services.ts
 
 ## Supabase authentication wiring (client)
 
-The app now gates entry behind a login screen and uses Supabase Auth (email/password) via REST calls.
+The app gates entry behind a login screen and uses Supabase Auth via REST calls. It supports:
+
+- Australian phone-number SMS OTP.
+- Google OAuth.
+- Facebook OAuth.
 
 Before app launch, set these globals in `index.tsx` (or your app bootstrap):
 
 ```ts
 (global as any).__BikeChatSupabaseUrl = 'https://<project-ref>.supabase.co';
 (global as any).__BikeChatSupabaseAnonKey = '<supabase-anon-key>';
+(global as any).__BikeChatGoogleWebClientId = '<google-web-client-id>.apps.googleusercontent.com';
 (global as any).__BikeChatApiBaseUrl = 'https://<your-backend-host>';
 ```
 
@@ -399,3 +404,18 @@ Auth flow behavior:
 - Login/sign-up stores session in AsyncStorage.
 - Access token is exposed to API/WS via `__BikeChatSupabaseAccessToken` automatically.
 - Sign out clears local session and backend token usage.
+
+For Google sign-in:
+
+- Enable the Google provider in Supabase Auth.
+- Add the Google OAuth Web client ID and client secret to Supabase.
+- Set `__BikeChatGoogleWebClientId` to the same Google OAuth Web client ID.
+- In Google Cloud, create Android OAuth client IDs for each app signing SHA-1 fingerprint using package name `com.convoii.app`. The native Google SDK needs these Android clients even though the app config uses the Web client ID.
+
+For Facebook sign-in, enable the Facebook provider in Supabase Auth and add this redirect URL to the project's allowed redirect URLs:
+
+```text
+bikechat://auth/callback
+```
+
+The Android app already registers the `bikechat://` scheme in `AndroidManifest.xml`.

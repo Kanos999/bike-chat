@@ -1,4 +1,4 @@
-package com.bikechattemp
+package com.convoii.app
 
 import android.hardware.Sensor
 import android.hardware.SensorEvent

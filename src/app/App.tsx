@@ -55,6 +55,7 @@ const AppInner = () => {
   const session = useAppStore((s) => s.session);
   const username = useAppStore((s) => s.username);
   const initializeAuth = useAppStore((s) => s.initializeAuth);
+  const handleAuthRedirect = useAppStore((s) => s.handleAuthRedirect);
   // Gate on the persisted profile having loaded so we don't flash the callsign
   // setup screen at existing users before hydrateProfile fills in their username.
   const [profileReady, setProfileReady] = useState(false);
@@ -78,7 +79,9 @@ const AppInner = () => {
   }, [navRef]);
 
   useEffect(() => {
-    const handle = (url: string | null) => {
+    const handle = async (url: string | null) => {
+      if (!url) return;
+      if (await handleAuthRedirect(url)) return;
       const code = parseJoinCode(url);
       if (!code) return;
       pendingJoin.current = code;
@@ -87,7 +90,7 @@ const AppInner = () => {
     void Linking.getInitialURL().then(handle);
     const sub = Linking.addEventListener('url', ({ url }) => handle(url));
     return () => sub.remove();
-  }, [flushPendingJoin]);
+  }, [flushPendingJoin, handleAuthRedirect]);
 
   useEffect(() => {
     config.riderIdGetter = () => useAppStore.getState().riderId;

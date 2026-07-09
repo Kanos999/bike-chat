@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   LayoutChangeEvent,
   Platform,
   Pressable,
@@ -13,12 +14,29 @@ import {
 import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import Svg, { Path } from 'react-native-svg';
 import ConcentricRings from '../components/ConcentricRings';
-import { accentFor, COLORS, FONT, HELMET_PATH } from '../components/bikerTheme';
+import { accentFor, COLORS, FONT } from '../components/bikerTheme';
+import type { OAuthProvider } from '../modules/auth/supabaseAuth';
 import { useAppStore } from '../state/store';
 
 const accent = accentFor('open');
+const BRAND_ORANGE = '#FF5A1F';
+const SOCIAL_PROVIDERS: Array<{
+  provider: OAuthProvider;
+  label: string;
+  mark: string;
+  markColor: string;
+  markTextColor: string;
+}> = [
+  { provider: 'google', label: 'Continue with Google', mark: 'G', markColor: '#fff', markTextColor: '#4285F4' },
+  {
+    provider: 'facebook',
+    label: 'Continue with Facebook',
+    mark: 'f',
+    markColor: '#1877F2',
+    markTextColor: '#fff',
+  },
+];
 
 // Auth is fixed to Australian numbers. The user enters their national number
 // (e.g. 0400 111 222) and we build the E.164 form (+61 400 111 222) for Supabase —
@@ -40,6 +58,7 @@ const LoginScreen = () => {
   const authError = useAppStore((state) => state.authError);
   const requestPhoneOtp = useAppStore((state) => state.requestPhoneOtp);
   const verifyPhoneOtp = useAppStore((state) => state.verifyPhoneOtp);
+  const signInWithOAuth = useAppStore((state) => state.signInWithOAuth);
 
   // Smoothly lift the centred form as the keyboard animates in, instead of the hard
   // re-centre the OS resize produces. Driven by the live keyboard height.
@@ -69,7 +88,7 @@ const LoginScreen = () => {
   );
   const enabled = step === 'phone' ? canRequestOtp : canVerifyOtp;
 
-  // Centre the full-bleed ring backdrop on the hero helmet bubble.
+  // Centre the full-bleed ring backdrop on the hero logo.
   const [centre, setCentre] = useState({ x: 0, y: 0 });
   const heroRef = useRef<View>(null);
   const onHeroLayout = (_e: LayoutChangeEvent) => {
@@ -117,6 +136,15 @@ const LoginScreen = () => {
     }
   };
 
+  const onOAuthSignIn = async (provider: OAuthProvider) => {
+    setLocalError(null);
+    try {
+      await signInWithOAuth(provider);
+    } catch {
+      // handled by authError
+    }
+  };
+
   // Auto-submit once the full code lands (typed or OS-autofilled), so a filled code
   // verifies without an extra tap. Guarded by ref so a failed code isn't re-submitted.
   const autoSubmittedRef = useRef<string | null>(null);
@@ -141,16 +169,21 @@ const LoginScreen = () => {
             {/* Hero */}
             <View style={styles.hero}>
               <View ref={heroRef} onLayout={onHeroLayout} style={styles.heroBubble}>
-                <Svg width={30} height={30} viewBox="0 0 24 24">
-                  <Path d={HELMET_PATH} fill={accent.base} />
-                </Svg>
+                <Image
+                  source={require('../../assets/Convoii-logo/icon-192.png')}
+                  style={styles.heroLogo}
+                  resizeMode="contain"
+                />
               </View>
-              <Text style={styles.title}>Bike Chat</Text>
+              <Text style={styles.title}>
+                <Text>Convo</Text>
+                <Text style={styles.titleAccent}>ii</Text>
+              </Text>
               <Text style={styles.tagline}>Open Comms · Sign in to go live</Text>
             </View>
 
-            {/* Form card */}
-            <View style={styles.card}>
+            {/* Form */}
+            <View style={styles.form}>
               <Text style={styles.label}>Mobile</Text>
               <View style={styles.phoneRow}>
                 <View style={styles.ccBox}>
@@ -236,6 +269,29 @@ const LoginScreen = () => {
               )}
             </Pressable>
 
+            {step === 'phone' ? (
+              <View style={styles.socialBlock}>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>or</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                {SOCIAL_PROVIDERS.map((item) => (
+                  <Pressable
+                    key={item.provider}
+                    onPress={() => onOAuthSignIn(item.provider)}
+                    disabled={authLoading}
+                    style={[styles.socialButton, authLoading ? styles.socialButtonDisabled : null]}
+                  >
+                    <View style={[styles.socialMark, { backgroundColor: item.markColor }]}>
+                      <Text style={[styles.socialMarkText, { color: item.markTextColor }]}>{item.mark}</Text>
+                    </View>
+                    <Text style={styles.socialButtonText}>{item.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
             {step === 'code' ? (
               <View style={styles.codeLinks}>
                 <Pressable disabled={authLoading || resendIn > 0} onPress={onResend} hitSlop={8}>
@@ -272,19 +328,22 @@ const styles = StyleSheet.create({
 
   hero: { alignItems: 'center', marginBottom: 36 },
   heroBubble: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    borderColor: accent.base,
-    backgroundColor: COLORS.innerA,
+    width: 78,
+    height: 78,
+    borderRadius: 22,
+    backgroundColor: '#070605',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: accent.base,
+    shadowColor: BRAND_ORANGE,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
+    shadowOpacity: 0.45,
     shadowRadius: 26,
     elevation: 10,
+  },
+  heroLogo: {
+    width: 78,
+    height: 78,
+    borderRadius: 22,
   },
   title: {
     marginTop: 18,
@@ -292,8 +351,8 @@ const styles = StyleSheet.create({
     fontSize: 38,
     color: '#fff',
     letterSpacing: 1,
-    textTransform: 'uppercase',
   },
+  titleAccent: { color: BRAND_ORANGE },
   tagline: {
     marginTop: 4,
     fontFamily: FONT,
@@ -303,13 +362,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  card: {
-    backgroundColor: 'rgba(12,12,12,0.85)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 10,
-    padding: 16,
-  },
+  form: {},
   label: {
     fontFamily: FONT,
     fontSize: 12,
@@ -369,6 +422,59 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   buttonText: { fontFamily: FONT, fontSize: 17, letterSpacing: 2.4, textTransform: 'uppercase' },
+
+  socialBlock: { marginTop: 20 },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontFamily: FONT,
+    fontSize: 12,
+    letterSpacing: 1.6,
+    color: 'rgba(255,255,255,0.42)',
+    textTransform: 'uppercase',
+  },
+  socialButton: {
+    height: 52,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.045)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingHorizontal: 14,
+  },
+  socialButtonDisabled: { opacity: 0.55 },
+  socialMark: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  socialMarkText: {
+    fontFamily: FONT,
+    fontSize: 17,
+    letterSpacing: 0,
+  },
+  socialButtonText: {
+    fontFamily: FONT,
+    fontSize: 16,
+    letterSpacing: 1.4,
+    color: '#fff',
+    textTransform: 'uppercase',
+  },
 
   codeLinks: {
     marginTop: 18,

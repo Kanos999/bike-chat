@@ -10,6 +10,7 @@
 const globals = global as unknown as {
   __BikeChatSupabaseUrl?: string;
   __BikeChatSupabaseAnonKey?: string;
+  __BikeChatGoogleWebClientId?: string;
   __BikeChatApiBaseUrl?: string;
 };
 
@@ -20,6 +21,10 @@ if (!globals.__BikeChatSupabaseUrl) {
 if (!globals.__BikeChatSupabaseAnonKey) {
   globals.__BikeChatSupabaseAnonKey = 'sb_publishable_EMd0bls_f1ou105wtEaIGQ_ET14gEto';
 }
+
+// Required for native Google Sign-In. Use the Google OAuth Web client ID, not
+// the Android client ID.
+globals.__BikeChatGoogleWebClientId = '439087840394-heno6rq8e6rpvvsed9oqsiun96lmee55.apps.googleusercontent.com';
 
 // Do not force an API base URL here; `src/config.ts` already provides sensible defaults
 // (Android emulator: http://10.0.2.2:3001 in dev).

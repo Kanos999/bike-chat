@@ -9,7 +9,7 @@ async function requestAndroidLocationPermission(): Promise<boolean> {
       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
       {
         title: 'Location for rides',
-        message: 'Bike Chat needs your location to show you on the map and connect you with nearby riders.',
+        message: 'Convoii needs your location to show you on the map and connect you with nearby riders.',
         buttonNeutral: 'Ask later',
         buttonNegative: 'Cancel',
         buttonPositive: 'OK',
@@ -20,7 +20,7 @@ async function requestAndroidLocationPermission(): Promise<boolean> {
       PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
       {
         title: 'Location for rides',
-        message: 'Bike Chat needs location access for ride presence.',
+        message: 'Convoii needs location access for ride presence.',
         buttonNeutral: 'Ask later',
         buttonNegative: 'Cancel',
         buttonPositive: 'OK',

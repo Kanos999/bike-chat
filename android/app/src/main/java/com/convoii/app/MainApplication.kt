@@ -1,4 +1,4 @@
-package com.bikechattemp
+package com.convoii.app
 
 import android.app.Application
 import com.facebook.react.PackageList

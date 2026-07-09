@@ -359,7 +359,7 @@ const HomeScreen = ({ navigation }: { navigation: AppNavigation }) => {
 
           <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-4">
-              <Text className="text-[11px] uppercase tracking-[3px] text-[#f4a261]">Bike Chat</Text>
+              <Text className="text-[11px] uppercase tracking-[3px] text-[#f4a261]">Convoii</Text>
             </View>
             <View className={`rounded-full border px-3 py-2 ${helmetConnected ? 'border-emerald-500/40 bg-emerald-500/12' : 'border-white/10 bg-white/5'}`}>
               <Text className={`text-[11px] font-semibold uppercase tracking-[2px] ${helmetConnected ? 'text-emerald-300' : 'text-bike-text-muted'}`}>
